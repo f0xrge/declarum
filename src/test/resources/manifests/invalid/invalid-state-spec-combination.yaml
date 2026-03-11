@@ -1,0 +1,13 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+resources:
+  - name: absent-with-spec
+    resourceType: sysobject
+    state: absent
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'obsolete'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: obsolete

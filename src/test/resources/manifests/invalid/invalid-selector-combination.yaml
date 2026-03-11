@@ -1,0 +1,14 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+resources:
+  - name: wrong-selector-combination
+    resourceType: folder
+    state: present
+    selector:
+      type: path
+      path: /Cabinet/Archive
+      dql: "dm_folder where object_name = 'Archive'"
+    spec:
+      objectType: dm_folder
+      attributes:
+        object_name: Archive
