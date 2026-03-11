@@ -1,6 +1,6 @@
-package com.example.docrepo.manifest;
+package com.f0xrge.declarum.manifest;
 
-import com.example.docrepo.manifest.model.ManifestDefinition;
+import com.f0xrge.declarum.manifest.model.ManifestDefinition;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
