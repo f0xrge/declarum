@@ -8,6 +8,9 @@ This starter pack includes:
 
 - YAML manifest model
 - Strict YAML loading via Jackson YAML
+- Engine core orchestration to load/validate manifests and request DFC difference analysis
+- Engine apply executor to run create/update/delete actions from analyzed differences
+- DFC adapter contract for selector resolution and managed-difference analysis
 - Unit tests for manifest deserialization
 - Architecture and decision records
 - Codex guidance files
@@ -32,6 +35,16 @@ mvn test
 
 ```text
 com.f0xrge.declarum
+├── dfc
+│   └── adapter
+│       ├── DfcAdapter.java
+│       ├── SelectorResolution.java
+│       └── DifferenceAnalysis.java
+├── engine
+│   └── core
+│       ├── EngineCore.java
+│       ├── ApplyExecutor.java
+│       └── ManifestAnalysisResult.java
 ├── manifest
 │   ├── ManifestReader.java
 │   └── model
