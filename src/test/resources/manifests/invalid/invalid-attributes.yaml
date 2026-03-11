@@ -1,0 +1,15 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+resources:
+  - name: invalid-attributes
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "my_type where object_name = 'broken'"
+    spec:
+      objectType: my_type
+      attributes:
+        nullable_value: null
+        nested_value:
+          key: value

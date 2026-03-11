@@ -1,0 +1,169 @@
+package com.f0xrge.declarum.manifest.validation;
+
+import com.f0xrge.declarum.manifest.model.ManifestDefinition;
+import com.f0xrge.declarum.manifest.model.ResourceDefinition;
+import com.f0xrge.declarum.manifest.model.SelectorDefinition;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class ManifestValidator {
+
+    private static final String SUPPORTED_API_VERSION = "docrepo/v1alpha1";
+    private static final String SUPPORTED_KIND = "Manifest";
+
+    public void validate(ManifestDefinition manifest) {
+        List<String> errors = new ArrayList<>();
+
+        if (manifest == null) {
+            errors.add("Manifest must not be null");
+            throw new ManifestValidationException(errors);
+        }
+
+        validateTopLevel(manifest, errors);
+        validateResources(manifest.getResources(), errors);
+
+        if (!errors.isEmpty()) {
+            throw new ManifestValidationException(errors);
+        }
+    }
+
+    private void validateTopLevel(ManifestDefinition manifest, List<String> errors) {
+        if (!SUPPORTED_API_VERSION.equals(manifest.getApiVersion())) {
+            errors.add("apiVersion must be '" + SUPPORTED_API_VERSION + "'");
+        }
+
+        if (!SUPPORTED_KIND.equals(manifest.getKind())) {
+            errors.add("kind must be '" + SUPPORTED_KIND + "'");
+        }
+
+        if (manifest.getResources() == null || manifest.getResources().isEmpty()) {
+            errors.add("resources must not be empty");
+        }
+    }
+
+    private void validateResources(List<ResourceDefinition> resources, List<String> errors) {
+        if (resources == null) {
+            return;
+        }
+
+        Set<String> resourceNames = new HashSet<>();
+        for (int i = 0; i < resources.size(); i++) {
+            ResourceDefinition resource = resources.get(i);
+            String resourcePath = "resources[" + i + "]";
+
+            if (resource == null) {
+                errors.add(resourcePath + " must not be null");
+                continue;
+            }
+
+            validateResourceName(resource, resourcePath, resourceNames, errors);
+            validateResourceStateAndSpec(resource, resourcePath, errors);
+            validateSelector(resource.getSelector(), resourcePath, errors);
+            validateAttributes(resource, resourcePath, errors);
+        }
+    }
+
+    private void validateResourceName(
+            ResourceDefinition resource,
+            String resourcePath,
+            Set<String> resourceNames,
+            List<String> errors
+    ) {
+        if (resource.getName() == null || resource.getName().isBlank()) {
+            errors.add(resourcePath + ".name is required");
+            return;
+        }
+
+        if (!resourceNames.add(resource.getName())) {
+            errors.add("Duplicate resource name: " + resource.getName());
+        }
+    }
+
+    private void validateResourceStateAndSpec(ResourceDefinition resource, String resourcePath, List<String> errors) {
+        if (resource.getState() == null) {
+            errors.add(resourcePath + ".state is required");
+            return;
+        }
+
+        if (resource.isPresentState() && resource.getSpec() == null) {
+            errors.add(resourcePath + ".spec is required when state=present");
+        }
+
+        if (resource.isAbsentState() && resource.getSpec() != null) {
+            errors.add(resourcePath + ".spec is forbidden when state=absent");
+        }
+
+        if (resource.getSpec() != null && (resource.getSpec().getObjectType() == null || resource.getSpec().getObjectType().isBlank())) {
+            errors.add(resourcePath + ".spec.objectType is required when spec is present");
+        }
+    }
+
+    private void validateSelector(SelectorDefinition selector, String resourcePath, List<String> errors) {
+        if (selector == null) {
+            errors.add(resourcePath + ".selector is required");
+            return;
+        }
+
+        if (selector.getType() == null) {
+            errors.add(resourcePath + ".selector.type is required");
+            return;
+        }
+
+        if (selector.isQualificationSelector()) {
+            if (selector.getDql() == null || selector.getDql().isBlank()) {
+                errors.add(resourcePath + ".selector.dql is required when selector.type=qualification");
+            }
+            if (selector.getPath() != null) {
+                errors.add(resourcePath + ".selector.path is forbidden when selector.type=qualification");
+            }
+        }
+
+        if (selector.isPathSelector()) {
+            if (selector.getPath() == null || selector.getPath().isBlank()) {
+                errors.add(resourcePath + ".selector.path is required when selector.type=path");
+            }
+            if (selector.getDql() != null) {
+                errors.add(resourcePath + ".selector.dql is forbidden when selector.type=path");
+            }
+        }
+    }
+
+    private void validateAttributes(ResourceDefinition resource, String resourcePath, List<String> errors) {
+        if (resource.getSpec() == null || resource.getSpec().getAttributes() == null) {
+            return;
+        }
+
+        for (Map.Entry<String, Object> entry : resource.getSpec().getAttributes().entrySet()) {
+            String attributePath = resourcePath + ".spec.attributes." + entry.getKey();
+            validateAttributeValue(entry.getValue(), attributePath, errors);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateAttributeValue(Object value, String attributePath, List<String> errors) {
+        if (value == null) {
+            errors.add(attributePath + " must not be null");
+            return;
+        }
+
+        if (value instanceof Map<?, ?>) {
+            errors.add(attributePath + " must not be a nested object");
+            return;
+        }
+
+        if (value instanceof List<?> listValue) {
+            for (int i = 0; i < listValue.size(); i++) {
+                Object listItem = listValue.get(i);
+                if (listItem == null) {
+                    errors.add(attributePath + "[" + i + "] must not be null");
+                } else if (listItem instanceof Map<?, ?> || listItem instanceof List<?>) {
+                    errors.add(attributePath + "[" + i + "] must be a scalar value");
+                }
+            }
+        }
+    }
+}
