@@ -1,9 +1,9 @@
-package com.example.docrepo.manifest;
+package com.f0xrge.declarum.manifest;
 
-import com.example.docrepo.manifest.model.DesiredState;
-import com.example.docrepo.manifest.model.ManifestDefinition;
-import com.example.docrepo.manifest.model.ResourceType;
-import com.example.docrepo.manifest.model.SelectorType;
+import com.f0xrge.declarum.manifest.model.DesiredState;
+import com.f0xrge.declarum.manifest.model.ManifestDefinition;
+import com.f0xrge.declarum.manifest.model.ResourceType;
+import com.f0xrge.declarum.manifest.model.SelectorType;
 import org.junit.jupiter.api.Test;
 
 import java.net.URISyntaxException;

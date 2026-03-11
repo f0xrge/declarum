@@ -1,4 +1,4 @@
-package com.example.docrepo.manifest.model;
+package com.f0xrge.declarum.manifest.model;
 
 public class ResourceDefinition {
 

@@ -1,4 +1,4 @@
-package com.example.docrepo.manifest.model;
+package com.f0xrge.declarum.manifest.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

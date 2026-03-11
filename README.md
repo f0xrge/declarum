@@ -31,7 +31,7 @@ mvn test
 ## Initial package layout
 
 ```text
-com.example.docrepo
+com.f0xrge.declarum
 ├── manifest
 │   ├── ManifestReader.java
 │   └── model
