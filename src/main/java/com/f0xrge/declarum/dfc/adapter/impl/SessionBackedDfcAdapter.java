@@ -1,5 +1,6 @@
 package com.f0xrge.declarum.dfc.adapter.impl;
 
+import com.f0xrge.declarum.dfc.adapter.AttributeChange;
 import com.f0xrge.declarum.dfc.adapter.DfcAdapter;
 import com.f0xrge.declarum.dfc.adapter.DifferenceAnalysis;
 import com.f0xrge.declarum.dfc.adapter.DifferenceType;
@@ -12,6 +13,9 @@ import com.f0xrge.declarum.dfc.session.SessionManager;
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
 import com.f0xrge.declarum.manifest.model.ResourceSpec;
 import com.f0xrge.declarum.manifest.model.SelectorDefinition;
+import com.f0xrge.declarum.observability.TelemetryLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +23,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class SessionBackedDfcAdapter implements DfcAdapter {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SessionBackedDfcAdapter.class);
 
     private final SessionManager sessionManager;
     private final RepositoryObjectOperations objectOperations;
@@ -39,7 +45,12 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         Objects.requireNonNull(resourceDefinition, "resourceDefinition is required");
         SelectorDefinition selectorDefinition = Objects.requireNonNull(resourceDefinition.getSelector(), "selector is required");
 
-        return sessionManager.execute(session -> {
+        TelemetryLog.info(LOGGER, "dfc.selector.resolve.start", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "selector.type", selectorDefinition.getType()
+        ));
+
+        SelectorResolution resolution = sessionManager.execute(session -> {
             if (selectorDefinition.isQualificationSelector()) {
                 List<RepositoryObjectSnapshot> matches = objectOperations.findByQualification(session, selectorDefinition.getDql());
                 if (matches.isEmpty()) {
@@ -59,6 +70,13 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
 
             throw new IllegalArgumentException("Unsupported selector type");
         });
+
+        TelemetryLog.info(LOGGER, "dfc.selector.resolve.result", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "selector.status", resolution.getStatus(),
+                "repository.object_id", resolution.getObject() == null ? null : resolution.getObject().getObjectId()
+        ));
+        return resolution;
     }
 
     @Override
@@ -67,13 +85,23 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         Objects.requireNonNull(actualObject, "actualObject is required");
 
         if (resourceDefinition.isAbsentState()) {
-            return actualObject
+            DifferenceAnalysis analysis = actualObject
                     .map(object -> new DifferenceAnalysis(DifferenceType.DELETE, Map.of(), "Object exists and must be deleted"))
                     .orElseGet(() -> new DifferenceAnalysis(DifferenceType.NO_CHANGES, Map.of(), "Object already absent"));
+            TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
+                    "resource.name", resourceDefinition.getName(),
+                    "difference.type", analysis.getDifferenceType()
+            ));
+            return analysis;
         }
 
         if (actualObject.isEmpty()) {
-            return new DifferenceAnalysis(DifferenceType.CREATE, Map.of(), "Object not found and must be created");
+            DifferenceAnalysis analysis = new DifferenceAnalysis(DifferenceType.CREATE, Map.of(), "Object not found and must be created");
+            TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
+                    "resource.name", resourceDefinition.getName(),
+                    "difference.type", analysis.getDifferenceType()
+            ));
+            return analysis;
         }
 
         RepositoryObjectSnapshot existingObject = actualObject.get();
@@ -97,14 +125,28 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         }
 
         Map<String, Object> desiredAttributes = spec == null || spec.getAttributes() == null ? Map.of() : spec.getAttributes();
-        Map<String, ?> changes = valueChecker.computeChanges(desiredAttributes, existingObject.getAttributes());
+        Map<String, AttributeChange> changes = valueChecker.computeChanges(desiredAttributes, existingObject.getAttributes());
 
         if (changes.isEmpty()) {
-            return new DifferenceAnalysis(DifferenceType.NO_CHANGES, Map.of(), "Managed attributes are already compliant");
+            DifferenceAnalysis analysis = new DifferenceAnalysis(DifferenceType.NO_CHANGES, Map.of(), "Managed attributes are already compliant");
+            TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
+                    "resource.name", resourceDefinition.getName(),
+                    "difference.type", analysis.getDifferenceType()
+            ));
+            return analysis;
         }
 
-        return new DifferenceAnalysis(DifferenceType.UPDATE, valueChecker.computeChanges(desiredAttributes, existingObject.getAttributes()),
-                "Managed attributes differ");
+        DifferenceAnalysis analysis = new DifferenceAnalysis(
+                DifferenceType.UPDATE,
+                changes,
+                "Managed attributes differ"
+        );
+        TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "difference.type", analysis.getDifferenceType(),
+                "difference.changed_count", analysis.getManagedAttributeChanges().size()
+        ));
+        return analysis;
     }
 
     @Override
@@ -116,7 +158,18 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         Map<String, Object> attributes = spec.getAttributes() == null ? Map.of() : spec.getAttributes();
         String folderPath = spec.getLocation() == null ? null : spec.getLocation().getPath();
 
-        return sessionManager.execute(session -> objectOperations.create(session, objectType, attributes, folderPath));
+        TelemetryLog.info(LOGGER, "dfc.resource.create.start", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "repository.object_type", objectType,
+                "repository.folder_path", folderPath
+        ));
+
+        RepositoryObjectSnapshot createdObject = sessionManager.execute(session -> objectOperations.create(session, objectType, attributes, folderPath));
+        TelemetryLog.info(LOGGER, "dfc.resource.create.success", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "repository.object_id", createdObject.getObjectId()
+        ));
+        return createdObject;
     }
 
     @Override
@@ -133,18 +186,32 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
                 .getAttributes();
         Map<String, Object> safeManagedAttributes = managedAttributes == null ? Map.of() : managedAttributes;
 
-        return sessionManager.execute(
+        TelemetryLog.info(LOGGER, "dfc.resource.update.start", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "repository.object_id", actualObject.getObjectId(),
+                "attributes.managed_count", safeManagedAttributes.size()
+        ));
+
+        RepositoryObjectSnapshot updatedObject = sessionManager.execute(
                 session -> objectOperations.updateAttributes(session, actualObject.getObjectId(), safeManagedAttributes)
         );
+
+        TelemetryLog.info(LOGGER, "dfc.resource.update.success", TelemetryLog.fields(
+                "resource.name", resourceDefinition.getName(),
+                "repository.object_id", updatedObject.getObjectId()
+        ));
+        return updatedObject;
     }
 
     @Override
     public void deleteResource(RepositoryObjectSnapshot actualObject) {
         Objects.requireNonNull(actualObject, "actualObject is required");
+        TelemetryLog.info(LOGGER, "dfc.resource.delete.start", TelemetryLog.fields("repository.object_id", actualObject.getObjectId()));
         sessionManager.executeVoid(session -> {
             objectOperations.delete(session, actualObject.getObjectId());
             return null;
         });
+        TelemetryLog.info(LOGGER, "dfc.resource.delete.success", TelemetryLog.fields("repository.object_id", actualObject.getObjectId()));
     }
 
     public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution) {

@@ -1,12 +1,17 @@
 package com.f0xrge.declarum.dfc.repository;
 
 import com.f0xrge.declarum.dfc.adapter.AttributeChange;
+import com.f0xrge.declarum.observability.TelemetryLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 public class ManagedAttributeValueChecker {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ManagedAttributeValueChecker.class);
 
     public Map<String, AttributeChange> computeChanges(Map<String, Object> desiredAttributes, Map<String, Object> actualAttributes) {
         Objects.requireNonNull(desiredAttributes, "desiredAttributes is required");
@@ -24,6 +29,10 @@ public class ManagedAttributeValueChecker {
             }
         }
 
+        TelemetryLog.info(LOGGER, "dfc.diff.attributes.computed", TelemetryLog.fields(
+                "attributes.managed_count", desiredAttributes.size(),
+                "attributes.changed_count", changes.size()
+        ));
         return changes;
     }
 }
