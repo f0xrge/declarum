@@ -3,6 +3,9 @@ package com.f0xrge.declarum.manifest.validation;
 import com.f0xrge.declarum.manifest.model.ManifestDefinition;
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
 import com.f0xrge.declarum.manifest.model.SelectorDefinition;
+import com.f0xrge.declarum.observability.TelemetryLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,14 +15,19 @@ import java.util.Set;
 
 public class ManifestValidator {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ManifestValidator.class);
     private static final String SUPPORTED_API_VERSION = "docrepo/v1alpha1";
     private static final String SUPPORTED_KIND = "Manifest";
 
     public void validate(ManifestDefinition manifest) {
         List<String> errors = new ArrayList<>();
+        TelemetryLog.info(LOGGER, "manifest.validation.start", TelemetryLog.fields(
+                "manifest.name", manifest == null || manifest.getMetadata() == null ? null : manifest.getMetadata().getName()
+        ));
 
         if (manifest == null) {
             errors.add("Manifest must not be null");
+            TelemetryLog.warn(LOGGER, "manifest.validation.failed", TelemetryLog.fields("validation.error_count", errors.size()));
             throw new ManifestValidationException(errors);
         }
 
@@ -27,8 +35,17 @@ public class ManifestValidator {
         validateResources(manifest.getResources(), errors);
 
         if (!errors.isEmpty()) {
+            TelemetryLog.warn(LOGGER, "manifest.validation.failed", TelemetryLog.fields(
+                    "manifest.name", manifest.getMetadata() == null ? null : manifest.getMetadata().getName(),
+                    "validation.error_count", errors.size()
+            ));
             throw new ManifestValidationException(errors);
         }
+
+        TelemetryLog.info(LOGGER, "manifest.validation.success", TelemetryLog.fields(
+                "manifest.name", manifest.getMetadata() == null ? null : manifest.getMetadata().getName(),
+                "manifest.resource_count", manifest.getResources() == null ? 0 : manifest.getResources().size()
+        ));
     }
 
     private void validateTopLevel(ManifestDefinition manifest, List<String> errors) {

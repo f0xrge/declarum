@@ -8,14 +8,20 @@ import com.f0xrge.declarum.manifest.ManifestReader;
 import com.f0xrge.declarum.manifest.model.ManifestDefinition;
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
 import com.f0xrge.declarum.manifest.validation.ManifestValidator;
+import com.f0xrge.declarum.observability.TelemetryLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class EngineCore {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(EngineCore.class);
 
     private final ManifestReader manifestReader;
     private final ManifestValidator manifestValidator;
@@ -28,11 +34,14 @@ public class EngineCore {
     }
 
     public ManifestAnalysisResult analyze(Path manifestPath) throws IOException {
+        TelemetryLog.info(LOGGER, "engine.analyze.start", TelemetryLog.fields("manifest.path", String.valueOf(manifestPath)));
+
         ManifestDefinition manifestDefinition = manifestReader.read(manifestPath);
         manifestValidator.validate(manifestDefinition);
 
         List<ResourceAnalysisResult> resourceAnalysisResults = new ArrayList<>();
         for (ResourceDefinition resourceDefinition : manifestDefinition.getResources()) {
+            TelemetryLog.info(LOGGER, "engine.analyze.resource.start", TelemetryLog.fields("resource.name", resourceDefinition.getName()));
             SelectorResolution selectorResolution = dfcAdapter.resolveBySelector(resourceDefinition);
             Optional<RepositoryObjectSnapshot> actualObject = Optional.ofNullable(selectorResolution.getObject());
             DifferenceAnalysis differenceAnalysis = dfcAdapter.analyzeDifference(resourceDefinition, actualObject);
@@ -42,9 +51,19 @@ public class EngineCore {
                     selectorResolution,
                     differenceAnalysis
             ));
+
+            TelemetryLog.info(LOGGER, "engine.analyze.resource.success", TelemetryLog.fields(
+                    "resource.name", resourceDefinition.getName(),
+                    "selector.status", selectorResolution.getStatus(),
+                    "difference.type", differenceAnalysis.getDifferenceType()
+            ));
         }
 
         String manifestName = manifestDefinition.getMetadata() == null ? null : manifestDefinition.getMetadata().getName();
+        TelemetryLog.info(LOGGER, "engine.analyze.success", TelemetryLog.fields(
+                "manifest.name", manifestName,
+                "manifest.resource_count", resourceAnalysisResults.size()
+        ));
         return new ManifestAnalysisResult(manifestName, resourceAnalysisResults);
     }
 }
