@@ -28,8 +28,10 @@ Build a declarative convergence engine for Documentum repositories with a workfl
 ## Build
 
 ```bash
-mvn test
+./mvnw test
 ```
+
+Use the Maven wrapper so the project runs with the expected Maven version. If needed, a local Maven installation can still run `mvn test`.
 
 ## Initial package layout
 
