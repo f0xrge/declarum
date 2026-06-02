@@ -20,6 +20,9 @@
 - Selector resolution
 - Type inspection
 - Attribute reading
+- Concrete DFC session factory
+- Concrete DFC repository object operations
+- Explicit Maven profile for real Documentum integration tests
 
 ## Phase 4 - Apply engine
 

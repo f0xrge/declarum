@@ -43,3 +43,8 @@ Any other repository attributes remain untouched.
 ## Decision 007 - Code language policy
 
 All code artifacts must be written in English, including comments and identifiers.
+
+
+## Decision 008 - Explicit integration-test profile
+
+Real Documentum integration tests must not run as part of the default unit-test lifecycle. They are isolated behind the `documentum-it` Maven profile and the Failsafe plugin, and they read connection settings from environment variables.

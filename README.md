@@ -11,6 +11,7 @@ This starter pack includes:
 - Engine core orchestration to load/validate manifests and request DFC difference analysis
 - Engine apply executor to run create/update/delete actions from analyzed differences
 - DFC adapter contract for selector resolution and managed-difference analysis
+- Concrete DFC session and repository operations backed by the real Documentum client at runtime
 - Unit tests for manifest deserialization
 - Architecture and decision records
 - Codex guidance files
@@ -33,15 +34,50 @@ Build a declarative convergence engine for Documentum repositories with a workfl
 
 Use the Maven wrapper so the project runs with the expected Maven version. If needed, a local Maven installation can still run `mvn test`.
 
+## Documentum integration tests
+
+Unit tests are isolated from real Documentum infrastructure. Classes named `*IT.java` are excluded from Surefire and are executed only by the Maven Failsafe plugin when the explicit `documentum-it` profile is enabled.
+
+Set the required connection variables before running integration tests:
+
+```bash
+export DOCUMENTUM_DOCBASE=your_docbase
+export DOCUMENTUM_USER=your_user
+export DOCUMENTUM_PASSWORD=your_password
+```
+
+Optional variables:
+
+```bash
+export DOCUMENTUM_DOMAIN=your_domain
+export DOCUMENTUM_DFC_JAR=/path/to/dfc.jar
+export DOCUMENTUM_TEST_PATH=/Cabinet/ObjectForReadOnlyTest
+export DOCUMENTUM_TEST_QUALIFICATION="dm_document where object_name = 'ObjectForReadOnlyTest'"
+```
+
+Run integration tests explicitly with:
+
+```bash
+./mvnw verify -Pdocumentum-it
+```
+
+The DFC implementation uses the real DFC client classes at runtime. Ensure the DFC JAR and any required Documentum runtime configuration are available on the integration-test classpath. Tests that require optional test object variables are skipped when those variables are not provided.
+
 ## Initial package layout
 
 ```text
 com.f0xrge.declarum
 ├── dfc
-│   └── adapter
-│       ├── DfcAdapter.java
-│       ├── SelectorResolution.java
-│       └── DifferenceAnalysis.java
+│   ├── adapter
+│   │   ├── DfcAdapter.java
+│   │   ├── SelectorResolution.java
+│   │   └── DifferenceAnalysis.java
+│   ├── repository
+│   │   ├── DfcRepositoryObjectOperations.java
+│   │   └── RepositoryObjectOperations.java
+│   └── session
+│       ├── DfcDocumentumSessionFactory.java
+│       └── DocumentumSessionFactory.java
 ├── engine
 │   └── core
 │       ├── EngineCore.java

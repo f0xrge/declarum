@@ -22,7 +22,7 @@ Responsible for resource resolution, diff computation, plan rendering, and apply
 
 ### DFC adapter layer
 
-Responsible for interacting with Documentum through DFC.
+Responsible for interacting with Documentum through DFC. The core adapter depends on repository and session interfaces, while the concrete DFC session factory and repository operations live inside the DFC layer and use the real Documentum client at runtime.
 
 ## High-level workflow
 
