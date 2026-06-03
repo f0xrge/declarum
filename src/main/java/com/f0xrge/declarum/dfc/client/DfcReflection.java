@@ -64,17 +64,39 @@ public final class DfcReflection {
         }
     }
 
+    public static boolean hasCompatibleMethod(Object target, String methodName, Object... arguments) {
+        Objects.requireNonNull(target, "target is required");
+        try {
+            findCompatibleMethod(target.getClass(), methodName, arguments);
+            return true;
+        } catch (NoSuchMethodException exception) {
+            return false;
+        }
+    }
+
     private static Method findCompatibleMethod(Class<?> type, String methodName, Object[] arguments) throws NoSuchMethodException {
         Class<?> currentType = type;
         while (currentType != null) {
-            for (Method method : currentType.getMethods()) {
-                if (method.getName().equals(methodName) && hasCompatibleParameters(method.getParameterTypes(), arguments)) {
-                    return method;
-                }
+            Method publicMethod = findCompatibleMethodInMethods(currentType.getMethods(), methodName, arguments);
+            if (publicMethod != null) {
+                return publicMethod;
+            }
+            Method declaredMethod = findCompatibleMethodInMethods(currentType.getDeclaredMethods(), methodName, arguments);
+            if (declaredMethod != null) {
+                return declaredMethod;
             }
             currentType = currentType.getSuperclass();
         }
         throw new NoSuchMethodException(type.getName() + "." + methodName);
+    }
+
+    private static Method findCompatibleMethodInMethods(Method[] methods, String methodName, Object[] arguments) {
+        for (Method method : methods) {
+            if (method.getName().equals(methodName) && hasCompatibleParameters(method.getParameterTypes(), arguments)) {
+                return method;
+            }
+        }
+        return null;
     }
 
     private static boolean hasCompatibleParameters(Class<?>[] parameterTypes, Object[] arguments) {
