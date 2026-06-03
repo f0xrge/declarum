@@ -64,6 +64,34 @@ Run plan analysis for a manifest with:
 
 If the real DFC client is not already available to the runtime, add it to the Maven or Java classpath before running the command.
 
+## Windows execution script
+
+A Windows helper script is available to run the analysis CLI against a real Documentum repository. It compiles the project, builds the runtime classpath, adds the DFC JAR, and then launches `com.f0xrge.declarum.cli.DeclarumCli`.
+
+Required environment variables:
+
+```cmd
+set DOCUMENTUM_DOCBASE=your_docbase
+set DOCUMENTUM_USER=your_user
+set DOCUMENTUM_PASSWORD=your_password
+set DOCUMENTUM_DFC_JAR=C:\path\to\dfc.jar
+```
+
+Optional environment variables:
+
+```cmd
+set DOCUMENTUM_DOMAIN=your_domain
+set DOCUMENTUM_DFC_CONFIG_DIR=C:\path\to\documentum-config-directory
+```
+
+Run a plan analysis from a Windows command prompt with:
+
+```cmd
+scripts\declarum-plan.cmd C:\path\to\manifest.yaml
+```
+
+`DOCUMENTUM_DFC_CONFIG_DIR` should point to the directory containing runtime DFC configuration such as `dfc.properties` when your Documentum client setup requires it. The script only runs analysis mode; it does not apply changes.
+
 ## Documentum integration tests
 
 Unit tests are isolated from real Documentum infrastructure. Classes named `*IT.java` are excluded from Surefire and are executed only by the Maven Failsafe plugin when the explicit `documentum-it` profile is enabled.
