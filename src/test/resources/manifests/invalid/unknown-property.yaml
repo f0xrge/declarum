@@ -1,0 +1,16 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+metadata:
+  name: unknown-property
+resources:
+  - name: object-with-unknown-property
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'object-with-unknown-property'"
+    unexpectedProperty: must-fail
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: object-with-unknown-property
