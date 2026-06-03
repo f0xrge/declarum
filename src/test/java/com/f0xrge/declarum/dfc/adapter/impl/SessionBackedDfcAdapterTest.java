@@ -72,7 +72,7 @@ class SessionBackedDfcAdapterTest {
         ResourceDefinition updateDefinition = presentResource("title", "updated-title");
         RepositoryObjectSnapshot current = snapshot("0900001", "dm_document", Map.of("title", "old-title"));
 
-        DifferenceAnalysis updateDifference = adapter.analyzeDifference(updateDefinition, Optional.of(current));
+        DifferenceAnalysis updateDifference = adapter.analyzeDifference(updateDefinition, SelectorResolution.found(current));
         RepositoryObjectSnapshot updated = adapter.updateResource(updateDefinition, current, updateDifference);
         assertEquals("updated-id", updated.getObjectId());
         assertEquals(1, operations.updateCalls);

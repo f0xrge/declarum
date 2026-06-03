@@ -5,6 +5,7 @@ import com.f0xrge.declarum.dfc.adapter.DifferenceAnalysis;
 import com.f0xrge.declarum.dfc.adapter.DifferenceType;
 import com.f0xrge.declarum.dfc.adapter.RepositoryObjectSnapshot;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolution;
+import com.f0xrge.declarum.dfc.adapter.SelectorResolutionStatus;
 import com.f0xrge.declarum.manifest.ManifestReader;
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
 import com.f0xrge.declarum.manifest.validation.ManifestValidationException;
@@ -17,9 +18,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class EngineCoreTest {
@@ -43,6 +44,21 @@ class EngineCoreTest {
     }
 
     @Test
+    void shouldReturnInvalidSelectionAndPlanNoMutationWhenSelectorIsAmbiguous() throws Exception {
+        RecordingDfcAdapter recordingDfcAdapter = new RecordingDfcAdapter();
+        recordingDfcAdapter.ambiguousResourceName = "app-config-main";
+        EngineCore engineCore = new EngineCore(new ManifestReader(), new ManifestValidator(), recordingDfcAdapter);
+
+        ManifestAnalysisResult result = engineCore.analyze(getResourcePath("manifests/valid-manifest.yaml"));
+
+        DifferenceType differenceType = result.getResources().get(0).getDifferenceAnalysis().getDifferenceType();
+        assertEquals(DifferenceType.INVALID_SELECTION, differenceType);
+        assertEquals(SelectorResolutionStatus.AMBIGUOUS, result.getResources().get(0).getSelectorResolution().getStatus());
+        assertEquals(List.of("app-config-main", "obsolete-config"), recordingDfcAdapter.analyzedResources);
+        assertFalse(List.of(DifferenceType.CREATE, DifferenceType.UPDATE, DifferenceType.DELETE).contains(differenceType));
+    }
+
+    @Test
     void shouldFailFastWhenManifestIsInvalid() {
         RecordingDfcAdapter recordingDfcAdapter = new RecordingDfcAdapter();
         EngineCore engineCore = new EngineCore(new ManifestReader(), new ManifestValidator(), recordingDfcAdapter);
@@ -61,10 +77,15 @@ class EngineCoreTest {
 
         private final List<String> resolvedResources = new ArrayList<>();
         private final List<String> analyzedResources = new ArrayList<>();
+        private String ambiguousResourceName;
 
         @Override
         public SelectorResolution resolveBySelector(ResourceDefinition resourceDefinition) {
             resolvedResources.add(resourceDefinition.getName());
+
+            if (resourceDefinition.getName().equals(ambiguousResourceName)) {
+                return SelectorResolution.ambiguous();
+            }
 
             if (resourceDefinition.isPresentState()) {
                 Map<String, Object> actualAttributes = new LinkedHashMap<>();
@@ -76,8 +97,12 @@ class EngineCoreTest {
         }
 
         @Override
-        public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, Optional<RepositoryObjectSnapshot> actualObject) {
+        public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution) {
             analyzedResources.add(resourceDefinition.getName());
+
+            if (SelectorResolutionStatus.AMBIGUOUS.equals(selectorResolution.getStatus())) {
+                return new DifferenceAnalysis(DifferenceType.INVALID_SELECTION, Map.of(), "Selector resolved more than one object");
+            }
 
             if (resourceDefinition.isPresentState()) {
                 return new DifferenceAnalysis(DifferenceType.UPDATE, Map.of(), "Managed attributes differ");

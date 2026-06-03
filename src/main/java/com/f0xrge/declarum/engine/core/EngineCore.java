@@ -2,7 +2,6 @@ package com.f0xrge.declarum.engine.core;
 
 import com.f0xrge.declarum.dfc.adapter.DfcAdapter;
 import com.f0xrge.declarum.dfc.adapter.DifferenceAnalysis;
-import com.f0xrge.declarum.dfc.adapter.RepositoryObjectSnapshot;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolution;
 import com.f0xrge.declarum.manifest.ManifestReader;
 import com.f0xrge.declarum.manifest.model.ManifestDefinition;
@@ -17,7 +16,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 public class EngineCore {
 
@@ -43,8 +41,7 @@ public class EngineCore {
         for (ResourceDefinition resourceDefinition : manifestDefinition.getResources()) {
             TelemetryLog.info(LOGGER, "engine.analyze.resource.start", TelemetryLog.fields("resource.name", resourceDefinition.getName()));
             SelectorResolution selectorResolution = dfcAdapter.resolveBySelector(resourceDefinition);
-            Optional<RepositoryObjectSnapshot> actualObject = Optional.ofNullable(selectorResolution.getObject());
-            DifferenceAnalysis differenceAnalysis = dfcAdapter.analyzeDifference(resourceDefinition, actualObject);
+            DifferenceAnalysis differenceAnalysis = dfcAdapter.analyzeDifference(resourceDefinition, selectorResolution);
 
             resourceAnalysisResults.add(new ResourceAnalysisResult(
                     resourceDefinition,
