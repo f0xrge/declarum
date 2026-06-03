@@ -39,17 +39,13 @@ if defined DOCUMENTUM_DFC_CONFIG_DIR if not exist "%DOCUMENTUM_DFC_CONFIG_DIR%" 
 
 pushd "%PROJECT_DIR%" || exit /b 1
 
-call "%PROJECT_DIR%\mvnw.cmd" -q -DskipTests compile dependency:build-classpath -Dmdep.outputFile=target\declarum-classpath.txt
+call "%PROJECT_DIR%\mvnw.cmd" -q -DskipTests compile dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=target\declarum-runtime-dependencies
 if errorlevel 1 (
     popd
     exit /b 1
 )
 
-set "DECLARUM_DEPENDENCY_CLASSPATH="
-if exist "target\declarum-classpath.txt" set /p DECLARUM_DEPENDENCY_CLASSPATH=<"target\declarum-classpath.txt"
-
-set "DECLARUM_RUNTIME_CLASSPATH=target\classes"
-if defined DECLARUM_DEPENDENCY_CLASSPATH set "DECLARUM_RUNTIME_CLASSPATH=%DECLARUM_RUNTIME_CLASSPATH%;%DECLARUM_DEPENDENCY_CLASSPATH%"
+set "DECLARUM_RUNTIME_CLASSPATH=target\classes;target\declarum-runtime-dependencies\*"
 set "DECLARUM_RUNTIME_CLASSPATH=%DECLARUM_RUNTIME_CLASSPATH%;%DOCUMENTUM_DFC_JAR%"
 if defined DOCUMENTUM_DFC_CONFIG_DIR set "DECLARUM_RUNTIME_CLASSPATH=%DOCUMENTUM_DFC_CONFIG_DIR%;%DECLARUM_RUNTIME_CLASSPATH%"
 if defined CLASSPATH set "DECLARUM_RUNTIME_CLASSPATH=%DECLARUM_RUNTIME_CLASSPATH%;%CLASSPATH%"

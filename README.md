@@ -66,7 +66,7 @@ If the real DFC client is not already available to the runtime, add it to the Ma
 
 ## Windows execution script
 
-A Windows helper script is available to run the analysis CLI against a real Documentum repository. It compiles the project, builds the runtime classpath, adds the DFC JAR, and then launches `com.f0xrge.declarum.cli.DeclarumCli`.
+A Windows helper script is available to run the analysis CLI against a real Documentum repository. It compiles the project, copies Maven runtime dependencies into `target\declarum-runtime-dependencies`, adds the DFC JAR to the runtime classpath, and then launches `com.f0xrge.declarum.cli.DeclarumCli`.
 
 Required environment variables:
 
