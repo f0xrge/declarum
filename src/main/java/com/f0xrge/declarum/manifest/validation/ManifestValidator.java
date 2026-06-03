@@ -78,6 +78,7 @@ public class ManifestValidator {
             }
 
             validateResourceName(resource, resourcePath, resourceNames, errors);
+            validateResourceType(resource, resourcePath, errors);
             validateResourceStateAndSpec(resource, resourcePath, errors);
             validateSelector(resource.getSelector(), resourcePath, errors);
             validateAttributes(resource, resourcePath, errors);
@@ -97,6 +98,12 @@ public class ManifestValidator {
 
         if (!resourceNames.add(resource.getName())) {
             errors.add("Duplicate resource name: " + resource.getName());
+        }
+    }
+
+    private void validateResourceType(ResourceDefinition resource, String resourcePath, List<String> errors) {
+        if (resource.getResourceType() == null) {
+            errors.add(resourcePath + ".resourceType is required");
         }
     }
 

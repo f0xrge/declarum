@@ -24,6 +24,13 @@ class ManifestValidatorTest {
     }
 
     @Test
+    void shouldFailWhenResourceTypeIsMissing() throws Exception {
+        ManifestDefinition manifest = manifestReader.read(getResourcePath("manifests/invalid/missing-resource-type.yaml"));
+
+        assertValidationErrorContains(manifest, "resourceType is required");
+    }
+
+    @Test
     void shouldFailWhenSpecIsProvidedForAbsentState() throws Exception {
         ManifestDefinition manifest = manifestReader.read(getResourcePath("manifests/invalid/invalid-state-spec-combination.yaml"));
 

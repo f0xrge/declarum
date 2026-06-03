@@ -1,0 +1,12 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+resources:
+  - name: missing-resource-type
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'missing-resource-type'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: missing-resource-type
