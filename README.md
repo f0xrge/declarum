@@ -10,6 +10,7 @@ This starter pack includes:
 - Strict YAML loading via Jackson YAML
 - Engine core orchestration to load/validate manifests and request DFC difference analysis
 - Engine apply executor to run create/update/delete actions from analyzed differences
+- MVP command-line entry point for manifest analysis and plan rendering
 - DFC adapter contract for selector resolution and managed-difference analysis
 - Concrete DFC session and repository operations backed by the real Documentum client at runtime
 - Unit tests for manifest deserialization
@@ -33,6 +34,35 @@ Build a declarative convergence engine for Documentum repositories with a workfl
 ```
 
 Use the Maven wrapper so the project runs with the expected Maven version. If needed, a local Maven installation can still run `mvn test`.
+
+
+## CLI analysis mode
+
+The MVP CLI runs analysis only: it loads a YAML manifest, validates it, asks the engine to analyze repository differences, and prints a readable plan. It does not apply changes.
+
+Set the required Documentum connection variables before running the CLI:
+
+```bash
+export DOCUMENTUM_DOCBASE=your_docbase
+export DOCUMENTUM_USER=your_user
+export DOCUMENTUM_PASSWORD=your_password
+```
+
+Optional variable:
+
+```bash
+export DOCUMENTUM_DOMAIN=your_domain
+```
+
+Run plan analysis for a manifest with:
+
+```bash
+./mvnw -q compile exec:java \
+  -Dexec.mainClass=com.f0xrge.declarum.cli.DeclarumCli \
+  -Dexec.args=/path/to/manifest.yaml
+```
+
+If the real DFC client is not already available to the runtime, add it to the Maven or Java classpath before running the command.
 
 ## Documentum integration tests
 
@@ -67,6 +97,8 @@ The DFC implementation uses the real DFC client classes at runtime. Ensure the D
 
 ```text
 com.f0xrge.declarum
+├── cli
+│   └── DeclarumCli.java
 ├── dfc
 │   ├── adapter
 │   │   ├── DfcAdapter.java
