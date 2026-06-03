@@ -94,11 +94,21 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
             String attributeName = DfcReflection.invoke(attribute, "getName").toString();
             if (Boolean.TRUE.equals(DfcReflection.invoke(object, "isAttrRepeating", attributeName))) {
                 attributes.put(attributeName, readRepeatingAttribute(object, attributeName));
-            } else if (!Boolean.TRUE.equals(DfcReflection.invoke(object, "isAttrNull", attributeName))) {
+            } else if (!isAttributeNull(object, attributeName)) {
                 attributes.put(attributeName, readScalarAttribute(object, attributeName));
             }
         }
         return attributes;
+    }
+
+    private boolean isAttributeNull(Object object, String attributeName) {
+        if (DfcReflection.hasCompatibleMethod(object, "isAttrNull", attributeName)) {
+            return Boolean.TRUE.equals(DfcReflection.invoke(object, "isAttrNull", attributeName));
+        }
+        if (DfcReflection.hasCompatibleMethod(object, "isNull", attributeName)) {
+            return Boolean.TRUE.equals(DfcReflection.invoke(object, "isNull", attributeName));
+        }
+        throw new IllegalStateException("Unable to invoke DFC method: isAttrNull or isNull");
     }
 
     private Object readScalarAttribute(Object object, String attributeName) {
