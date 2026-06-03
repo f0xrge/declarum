@@ -20,7 +20,6 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -93,7 +92,7 @@ class DeclarumCliTest {
         }
 
         @Override
-        public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, Optional<RepositoryObjectSnapshot> actualObject) {
+        public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution) {
             if (resourceDefinition.isPresentState()) {
                 Map<String, AttributeChange> changes = new LinkedHashMap<>();
                 changes.put("object_name", new AttributeChange("old-main-config", "main-config"));

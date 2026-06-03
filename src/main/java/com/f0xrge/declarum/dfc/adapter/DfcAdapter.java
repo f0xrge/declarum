@@ -2,13 +2,11 @@ package com.f0xrge.declarum.dfc.adapter;
 
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
 
-import java.util.Optional;
-
 public interface DfcAdapter {
 
     SelectorResolution resolveBySelector(ResourceDefinition resourceDefinition);
 
-    DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, Optional<RepositoryObjectSnapshot> actualObject);
+    DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution);
 
     RepositoryObjectSnapshot createResource(ResourceDefinition resourceDefinition);
 

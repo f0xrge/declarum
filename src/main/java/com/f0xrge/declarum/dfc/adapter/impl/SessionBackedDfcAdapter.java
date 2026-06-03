@@ -80,9 +80,24 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
     }
 
     @Override
-    public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, Optional<RepositoryObjectSnapshot> actualObject) {
+    public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution) {
         Objects.requireNonNull(resourceDefinition, "resourceDefinition is required");
-        Objects.requireNonNull(actualObject, "actualObject is required");
+        Objects.requireNonNull(selectorResolution, "selectorResolution is required");
+
+        if (SelectorResolutionStatus.AMBIGUOUS.equals(selectorResolution.getStatus())) {
+            DifferenceAnalysis analysis = new DifferenceAnalysis(
+                    DifferenceType.INVALID_SELECTION,
+                    Map.of(),
+                    "Selector resolved more than one object"
+            );
+            TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
+                    "resource.name", resourceDefinition.getName(),
+                    "difference.type", analysis.getDifferenceType()
+            ));
+            return analysis;
+        }
+
+        Optional<RepositoryObjectSnapshot> actualObject = Optional.ofNullable(selectorResolution.getObject());
 
         if (resourceDefinition.isAbsentState()) {
             DifferenceAnalysis analysis = actualObject
@@ -214,13 +229,4 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         TelemetryLog.info(LOGGER, "dfc.resource.delete.success", TelemetryLog.fields("repository.object_id", actualObject.getObjectId()));
     }
 
-    public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution) {
-        Objects.requireNonNull(selectorResolution, "selectorResolution is required");
-
-        if (SelectorResolutionStatus.AMBIGUOUS.equals(selectorResolution.getStatus())) {
-            return new DifferenceAnalysis(DifferenceType.INVALID_SELECTION, Map.of(), "Selector resolved more than one object");
-        }
-
-        return analyzeDifference(resourceDefinition, Optional.ofNullable(selectorResolution.getObject()));
-    }
 }
