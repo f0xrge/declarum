@@ -4,6 +4,7 @@ import com.f0xrge.declarum.manifest.model.DesiredState;
 import com.f0xrge.declarum.manifest.model.ManifestDefinition;
 import com.f0xrge.declarum.manifest.model.ResourceType;
 import com.f0xrge.declarum.manifest.model.SelectorType;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.junit.jupiter.api.Test;
 
 import java.net.URISyntaxException;
@@ -11,6 +12,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ManifestReaderTest {
 
@@ -36,6 +38,14 @@ class ManifestReaderTest {
 
         assertEquals("obsolete-config", manifest.getResources().get(1).getName());
         assertEquals(DesiredState.ABSENT, manifest.getResources().get(1).getState());
+    }
+
+    @Test
+    void shouldFailWhenManifestContainsUnknownProperty() throws Exception {
+        ManifestReader manifestReader = new ManifestReader();
+        Path manifestPath = getResourcePath("manifests/invalid/unknown-property.yaml");
+
+        assertThrows(UnrecognizedPropertyException.class, () -> manifestReader.read(manifestPath));
     }
 
     private Path getResourcePath(String resourceName) throws URISyntaxException {
