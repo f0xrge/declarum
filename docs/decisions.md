@@ -48,3 +48,16 @@ All code artifacts must be written in English, including comments and identifier
 ## Decision 008 - Explicit integration-test profile
 
 Real Documentum integration tests must not run as part of the default unit-test lifecycle. They are isolated behind the `documentum-it` Maven profile and the Failsafe plugin, and they read connection settings from environment variables.
+
+
+## Decision 009 - Explicit location path cardinality
+
+Managed repository folder links use an explicit cardinality contract:
+
+- `spec.location.path` declares exactly one managed folder path.
+- `spec.location.paths` declares one or more managed folder paths.
+- `spec.location.path` and `spec.location.paths` are mutually exclusive.
+- Location path strings must not be blank.
+- `spec.location.paths` must not be empty and must not contain `null` or blank values.
+
+This keeps the YAML contract strict while allowing resources to declare multiple managed repository links.

@@ -18,6 +18,7 @@ import com.f0xrge.declarum.observability.TelemetryLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -174,16 +175,19 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
     }
 
     private List<PathChange> computePathChanges(ResourceSpec spec, RepositoryObjectSnapshot existingObject) {
-        String desiredPath = spec == null || spec.getLocation() == null ? null : spec.getLocation().getPath();
-        if (desiredPath == null || desiredPath.isBlank()) {
+        List<String> desiredPaths = spec == null || spec.getLocation() == null ? List.of() : spec.getLocation().managedPaths();
+        if (desiredPaths.isEmpty()) {
             return List.of();
         }
 
         List<String> currentPaths = existingObject.getFolderPaths();
-        if (currentPaths.contains(desiredPath)) {
-            return List.of();
+        List<PathChange> pathChanges = new ArrayList<>();
+        for (String desiredPath : desiredPaths) {
+            if (!currentPaths.contains(desiredPath)) {
+                pathChanges.add(new PathChange(currentPaths, desiredPath));
+            }
         }
-        return List.of(new PathChange(currentPaths, desiredPath));
+        return pathChanges;
     }
 
     private String differenceMessage(Map<String, AttributeChange> attributeChanges, List<PathChange> pathChanges) {
@@ -203,15 +207,15 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
 
         String objectType = Objects.requireNonNull(spec.getObjectType(), "spec.objectType is required for create");
         Map<String, Object> attributes = spec.getAttributes() == null ? Map.of() : spec.getAttributes();
-        String folderPath = spec.getLocation() == null ? null : spec.getLocation().getPath();
+        List<String> folderPaths = spec.getLocation() == null ? List.of() : spec.getLocation().managedPaths();
 
         TelemetryLog.info(LOGGER, "dfc.resource.create.start", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),
                 "repository.object_type", objectType,
-                "repository.folder_path", folderPath
+                "repository.folder_paths", folderPaths
         ));
 
-        RepositoryObjectSnapshot createdObject = sessionManager.execute(session -> objectOperations.create(session, objectType, attributes, folderPath));
+        RepositoryObjectSnapshot createdObject = sessionManager.execute(session -> objectOperations.create(session, objectType, attributes, folderPaths));
         TelemetryLog.info(LOGGER, "dfc.resource.create.success", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),
                 "repository.object_id", createdObject.getObjectId()
@@ -239,9 +243,20 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
                 "attributes.managed_count", safeManagedAttributes.size()
         ));
 
-        RepositoryObjectSnapshot updatedObject = sessionManager.execute(
-                session -> objectOperations.updateAttributes(session, actualObject.getObjectId(), safeManagedAttributes)
-        );
+        RepositoryObjectSnapshot updatedObject = sessionManager.execute(session -> {
+            RepositoryObjectSnapshot attributeUpdatedObject = objectOperations.updateAttributes(
+                    session,
+                    actualObject.getObjectId(),
+                    safeManagedAttributes
+            );
+            List<String> desiredPathLinks = differenceAnalysis.getPathChanges().stream()
+                    .map(PathChange::getDesiredPath)
+                    .toList();
+            if (desiredPathLinks.isEmpty()) {
+                return attributeUpdatedObject;
+            }
+            return objectOperations.linkFolderPaths(session, actualObject.getObjectId(), desiredPathLinks);
+        });
 
         TelemetryLog.info(LOGGER, "dfc.resource.update.success", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),

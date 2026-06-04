@@ -126,14 +126,33 @@ resources:
 - Nested objects are forbidden in the MVP
 - `null` values are forbidden in the MVP
 
+#### `spec.location`
+
+- Optional
+- If present, it must define exactly one of `path` or `paths`.
+- Empty `location` objects are invalid.
+
 #### `spec.location.path`
 
 - Optional
-- If present, it identifies the target repository folder link
+- Type: `string`
+- Must not be blank when present.
+- Identifies one managed target repository folder link.
+- Mutually exclusive with `spec.location.paths`.
+
+#### `spec.location.paths`
+
+- Optional
+- Type: `array<string>`
+- Must not be empty when present.
+- Items must not be `null` or blank.
+- Identifies multiple managed target repository folder links.
+- Mutually exclusive with `spec.location.path`.
 
 ## Behavioral rules
 
 - A selector must resolve to at most one object.
+- A location declares managed folder links with either `spec.location.path` for one path or `spec.location.paths` for multiple paths, never both.
 - `present` means create if absent, update if different, and leave unchanged if already compliant.
 - `absent` means delete if present and do nothing if already absent.
 - No implicit delete is allowed by omission from the manifest.

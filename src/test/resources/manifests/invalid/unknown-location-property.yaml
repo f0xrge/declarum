@@ -1,0 +1,16 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+resources:
+  - name: object-with-unknown-location-property
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'object-with-unknown-location-property'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: object-with-unknown-location-property
+      location:
+        path: /Cabinet/Config
+        unexpectedLocationProperty: must-fail

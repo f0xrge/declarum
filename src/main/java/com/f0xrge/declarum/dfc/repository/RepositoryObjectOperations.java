@@ -17,13 +17,19 @@ public interface RepositoryObjectOperations {
             DocumentumSession session,
             String objectType,
             Map<String, Object> attributes,
-            String folderPath
+            List<String> folderPaths
     );
 
     RepositoryObjectSnapshot updateAttributes(
             DocumentumSession session,
             String objectId,
             Map<String, Object> attributes
+    );
+
+    RepositoryObjectSnapshot linkFolderPaths(
+            DocumentumSession session,
+            String objectId,
+            List<String> folderPaths
     );
 
     void delete(DocumentumSession session, String objectId);

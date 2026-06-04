@@ -1,0 +1,67 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+resources:
+  - name: blank-single-path
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'blank-single-path'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: blank-single-path
+      location:
+        path: "  "
+  - name: empty-multiple-paths
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'empty-multiple-paths'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: empty-multiple-paths
+      location:
+        paths: []
+  - name: invalid-multiple-paths
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'invalid-multiple-paths'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: invalid-multiple-paths
+      location:
+        paths:
+          - "/Cabinet/Valid"
+          - null
+          - " "
+  - name: ambiguous-location
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'ambiguous-location'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: ambiguous-location
+      location:
+        path: "/Cabinet/Single"
+        paths:
+          - "/Cabinet/Multi"
+  - name: empty-location
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_document where object_name = 'empty-location'"
+    spec:
+      objectType: dm_document
+      attributes:
+        object_name: empty-location
+      location: {}

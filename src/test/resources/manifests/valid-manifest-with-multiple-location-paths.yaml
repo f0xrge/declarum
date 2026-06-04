@@ -1,0 +1,19 @@
+apiVersion: docrepo/v1alpha1
+kind: Manifest
+metadata:
+  name: multi-path-location
+resources:
+  - name: app-config-main
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "my_app_config where config_key = 'main'"
+    spec:
+      objectType: my_app_config
+      attributes:
+        object_name: "main-config"
+      location:
+        paths:
+          - "/Cabinet/Config"
+          - "/Cabinet/Archive"

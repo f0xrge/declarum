@@ -24,6 +24,13 @@ class ManifestValidatorTest {
     }
 
     @Test
+    void shouldValidateManifestWithMultipleLocationPaths() throws Exception {
+        ManifestDefinition manifest = manifestReader.read(getResourcePath("manifests/valid-manifest-with-multiple-location-paths.yaml"));
+
+        assertDoesNotThrow(() -> manifestValidator.validate(manifest));
+    }
+
+    @Test
     void shouldFailWhenResourceTypeIsMissing() throws Exception {
         ManifestDefinition manifest = manifestReader.read(getResourcePath("manifests/invalid/missing-resource-type.yaml"));
 
@@ -42,6 +49,18 @@ class ManifestValidatorTest {
         ManifestDefinition manifest = manifestReader.read(getResourcePath("manifests/invalid/invalid-selector-combination.yaml"));
 
         assertValidationErrorContains(manifest, ".selector.dql is forbidden when selector.type=path");
+    }
+
+    @Test
+    void shouldFailWhenLocationPathsAreInvalid() throws Exception {
+        ManifestDefinition manifest = manifestReader.read(getResourcePath("manifests/invalid/invalid-location-paths.yaml"));
+
+        assertValidationErrorContains(manifest, ".spec.location.path must not be blank");
+        assertValidationErrorContains(manifest, ".spec.location.paths must not be empty");
+        assertValidationErrorContains(manifest, ".spec.location.paths[1] must not be null");
+        assertValidationErrorContains(manifest, ".spec.location.paths[2] must not be blank");
+        assertValidationErrorContains(manifest, ".spec.location.path and .spec.location.paths are mutually exclusive");
+        assertValidationErrorContains(manifest, ".spec.location must define either path or paths");
     }
 
     @Test

@@ -81,6 +81,7 @@ public class ManifestValidator {
             validateResourceType(resource, resourcePath, errors);
             validateResourceStateAndSpec(resource, resourcePath, errors);
             validateSelector(resource.getSelector(), resourcePath, errors);
+            validateLocation(resource, resourcePath, errors);
             validateAttributes(resource, resourcePath, errors);
         }
     }
@@ -152,6 +153,50 @@ public class ManifestValidator {
             }
             if (selector.getDql() != null) {
                 errors.add(resourcePath + ".selector.dql is forbidden when selector.type=path");
+            }
+        }
+    }
+
+    private void validateLocation(ResourceDefinition resource, String resourcePath, List<String> errors) {
+        if (resource.getSpec() == null || resource.getSpec().getLocation() == null) {
+            return;
+        }
+
+        String path = resource.getSpec().getLocation().getPath();
+        List<String> paths = resource.getSpec().getLocation().getPaths();
+        boolean hasPath = path != null;
+        boolean hasPaths = paths != null;
+
+        if (!hasPath && !hasPaths) {
+            errors.add(resourcePath + ".spec.location must define either path or paths");
+            return;
+        }
+
+        if (hasPath && hasPaths) {
+            errors.add(resourcePath + ".spec.location.path and .spec.location.paths are mutually exclusive");
+        }
+
+        if (hasPath && path.isBlank()) {
+            errors.add(resourcePath + ".spec.location.path must not be blank");
+        }
+
+        if (hasPaths) {
+            validateLocationPaths(paths, resourcePath, errors);
+        }
+    }
+
+    private void validateLocationPaths(List<String> paths, String resourcePath, List<String> errors) {
+        if (paths.isEmpty()) {
+            errors.add(resourcePath + ".spec.location.paths must not be empty");
+            return;
+        }
+
+        for (int i = 0; i < paths.size(); i++) {
+            String locationPath = paths.get(i);
+            if (locationPath == null) {
+                errors.add(resourcePath + ".spec.location.paths[" + i + "] must not be null");
+            } else if (locationPath.isBlank()) {
+                errors.add(resourcePath + ".spec.location.paths[" + i + "] must not be blank");
             }
         }
     }
