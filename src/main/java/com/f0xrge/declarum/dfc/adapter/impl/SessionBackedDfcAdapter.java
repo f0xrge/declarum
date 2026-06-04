@@ -14,6 +14,7 @@ import com.f0xrge.declarum.dfc.session.SessionManager;
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
 import com.f0xrge.declarum.manifest.model.ResourceSpec;
 import com.f0xrge.declarum.manifest.model.SelectorDefinition;
+import com.f0xrge.declarum.manifest.model.SelectorType;
 import com.f0xrge.declarum.observability.TelemetryLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,11 +145,13 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         Map<String, Object> desiredAttributes = spec == null || spec.getAttributes() == null ? Map.of() : spec.getAttributes();
         Map<String, AttributeChange> attributeChanges = valueChecker.computeChanges(desiredAttributes, existingObject.getAttributes());
         List<PathChange> pathChanges = computePathChanges(spec, existingObject);
+        List<String> managedPathRemovals = computeManagedPathRemovals(resourceDefinition, spec, existingObject);
 
-        if (attributeChanges.isEmpty() && pathChanges.isEmpty()) {
+        if (attributeChanges.isEmpty() && pathChanges.isEmpty() && managedPathRemovals.isEmpty()) {
             DifferenceAnalysis analysis = new DifferenceAnalysis(
                     DifferenceType.NO_CHANGES,
                     Map.of(),
+                    List.of(),
                     List.of(),
                     "Managed attributes and location are already compliant"
             );
@@ -163,13 +166,15 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
                 DifferenceType.UPDATE,
                 attributeChanges,
                 pathChanges,
-                differenceMessage(attributeChanges, pathChanges)
+                managedPathRemovals,
+                differenceMessage(attributeChanges, pathChanges, managedPathRemovals)
         );
         TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),
                 "difference.type", analysis.getDifferenceType(),
                 "difference.attribute_changed_count", analysis.getManagedAttributeChanges().size(),
-                "difference.path_changed_count", analysis.getPathChanges().size()
+                "difference.path_changed_count", analysis.getPathChanges().size(),
+                "difference.path_removal_count", analysis.getManagedPathRemovals().size()
         ));
         return analysis;
     }
@@ -190,11 +195,39 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         return pathChanges;
     }
 
-    private String differenceMessage(Map<String, AttributeChange> attributeChanges, List<PathChange> pathChanges) {
-        if (!attributeChanges.isEmpty() && !pathChanges.isEmpty()) {
+    private List<String> computeManagedPathRemovals(
+            ResourceDefinition resourceDefinition,
+            ResourceSpec spec,
+            RepositoryObjectSnapshot existingObject
+    ) {
+        List<String> desiredPaths = spec == null || spec.getLocation() == null ? List.of() : spec.getLocation().managedPaths();
+        if (desiredPaths.isEmpty() || resourceDefinition.getSelector() == null) {
+            return List.of();
+        }
+        if (!SelectorType.PATH.equals(resourceDefinition.getSelector().getType())) {
+            return List.of();
+        }
+
+        String selectorPath = resourceDefinition.getSelector().getPath();
+        if (selectorPath == null || selectorPath.isBlank()) {
+            return List.of();
+        }
+        if (desiredPaths.contains(selectorPath) || !existingObject.getFolderPaths().contains(selectorPath)) {
+            return List.of();
+        }
+        return List.of(selectorPath);
+    }
+
+    private String differenceMessage(
+            Map<String, AttributeChange> attributeChanges,
+            List<PathChange> pathChanges,
+            List<String> managedPathRemovals
+    ) {
+        boolean locationDiffers = !pathChanges.isEmpty() || !managedPathRemovals.isEmpty();
+        if (!attributeChanges.isEmpty() && locationDiffers) {
             return "Managed attributes and location differ";
         }
-        if (!pathChanges.isEmpty()) {
+        if (locationDiffers) {
             return "Managed location differs";
         }
         return "Managed attributes differ";
@@ -233,30 +266,27 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         Objects.requireNonNull(actualObject, "actualObject is required");
         Objects.requireNonNull(differenceAnalysis, "differenceAnalysis is required");
 
-        Map<String, Object> managedAttributes = Objects.requireNonNull(resourceDefinition.getSpec(), "spec is required for update")
-                .getAttributes();
+        ResourceSpec spec = Objects.requireNonNull(resourceDefinition.getSpec(), "spec is required for update");
+        Map<String, Object> managedAttributes = spec.getAttributes();
         Map<String, Object> safeManagedAttributes = managedAttributes == null ? Map.of() : managedAttributes;
+        List<String> desiredFolderPaths = spec.getLocation() == null ? List.of() : spec.getLocation().managedPaths();
+        List<String> managedFolderPathsToRemove = differenceAnalysis.getManagedPathRemovals();
 
         TelemetryLog.info(LOGGER, "dfc.resource.update.start", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),
                 "repository.object_id", actualObject.getObjectId(),
-                "attributes.managed_count", safeManagedAttributes.size()
+                "attributes.managed_count", safeManagedAttributes.size(),
+                "repository.folder_paths", desiredFolderPaths,
+                "repository.folder_paths_to_remove", managedFolderPathsToRemove
         ));
 
-        RepositoryObjectSnapshot updatedObject = sessionManager.execute(session -> {
-            RepositoryObjectSnapshot attributeUpdatedObject = objectOperations.updateAttributes(
-                    session,
-                    actualObject.getObjectId(),
-                    safeManagedAttributes
-            );
-            List<String> desiredPathLinks = differenceAnalysis.getPathChanges().stream()
-                    .map(PathChange::getDesiredPath)
-                    .toList();
-            if (desiredPathLinks.isEmpty()) {
-                return attributeUpdatedObject;
-            }
-            return objectOperations.linkFolderPaths(session, actualObject.getObjectId(), desiredPathLinks);
-        });
+        RepositoryObjectSnapshot updatedObject = sessionManager.execute(session -> objectOperations.update(
+                session,
+                actualObject.getObjectId(),
+                safeManagedAttributes,
+                desiredFolderPaths,
+                managedFolderPathsToRemove
+        ));
 
         TelemetryLog.info(LOGGER, "dfc.resource.update.success", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),

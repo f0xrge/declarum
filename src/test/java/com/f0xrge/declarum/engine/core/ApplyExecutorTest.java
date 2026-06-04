@@ -33,6 +33,7 @@ class ApplyExecutorTest {
         assertEquals(1, adapter.createdResources);
         assertEquals(1, adapter.updatedResources);
         assertEquals(1, adapter.deletedResources);
+        assertEquals(DifferenceType.UPDATE, adapter.lastUpdateDifferenceAnalysis.getDifferenceType());
 
         assertEquals(ApplyActionType.CREATED, applyResult.getResources().get(0).getActionType());
         assertEquals(ApplyActionType.UPDATED, applyResult.getResources().get(1).getActionType());
@@ -72,6 +73,7 @@ class ApplyExecutorTest {
         private int createdResources;
         private int updatedResources;
         private int deletedResources;
+        private DifferenceAnalysis lastUpdateDifferenceAnalysis;
 
         @Override
         public SelectorResolution resolveBySelector(ResourceDefinition resourceDefinition) {
@@ -96,6 +98,7 @@ class ApplyExecutorTest {
                 DifferenceAnalysis differenceAnalysis
         ) {
             updatedResources++;
+            lastUpdateDifferenceAnalysis = differenceAnalysis;
             return actualObject;
         }
 

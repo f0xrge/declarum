@@ -20,16 +20,12 @@ public interface RepositoryObjectOperations {
             List<String> folderPaths
     );
 
-    RepositoryObjectSnapshot updateAttributes(
+    RepositoryObjectSnapshot update(
             DocumentumSession session,
             String objectId,
-            Map<String, Object> attributes
-    );
-
-    RepositoryObjectSnapshot linkFolderPaths(
-            DocumentumSession session,
-            String objectId,
-            List<String> folderPaths
+            Map<String, Object> attributes,
+            List<String> desiredFolderPaths,
+            List<String> managedFolderPathsToRemove
     );
 
     void delete(DocumentumSession session, String objectId);

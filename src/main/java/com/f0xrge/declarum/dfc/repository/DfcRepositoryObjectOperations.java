@@ -57,17 +57,16 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
     }
 
     @Override
-    public RepositoryObjectSnapshot updateAttributes(DocumentumSession session, String objectId, Map<String, Object> attributes) {
+    public RepositoryObjectSnapshot update(
+            DocumentumSession session,
+            String objectId,
+            Map<String, Object> attributes,
+            List<String> desiredFolderPaths,
+            List<String> managedFolderPathsToRemove
+    ) {
         Object object = getObjectById(requireDfcSession(session), requireText(objectId, "objectId is required"));
         applyAttributes(object, safeAttributes(attributes));
-        DfcReflection.invoke(object, "save");
-        return toSnapshot(object);
-    }
-
-    @Override
-    public RepositoryObjectSnapshot linkFolderPaths(DocumentumSession session, String objectId, List<String> folderPaths) {
-        Object object = getObjectById(requireDfcSession(session), requireText(objectId, "objectId is required"));
-        linkFolderPaths(object, folderPaths);
+        updateFolderPaths(object, desiredFolderPaths, managedFolderPathsToRemove);
         DfcReflection.invoke(object, "save");
         return toSnapshot(object);
     }
@@ -191,12 +190,26 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
     }
 
     private void linkFolderPaths(Object object, List<String> folderPaths) {
-        if (folderPaths == null) {
-            return;
+        for (String folderPath : safePaths(folderPaths)) {
+            DfcReflection.invoke(object, "link", folderPath);
         }
-        for (String folderPath : folderPaths) {
-            if (folderPath != null && !folderPath.isBlank()) {
-                DfcReflection.invoke(object, "link", folderPath);
+    }
+
+    private void updateFolderPaths(Object object, List<String> desiredFolderPaths, List<String> managedFolderPathsToRemove) {
+        LinkedHashSet<String> currentFolderPaths = new LinkedHashSet<>(readFolderPaths(object));
+        LinkedHashSet<String> desiredPaths = new LinkedHashSet<>(safePaths(desiredFolderPaths));
+
+        for (String desiredPath : desiredPaths) {
+            if (!currentFolderPaths.contains(desiredPath)) {
+                DfcReflection.invoke(object, "link", desiredPath);
+                currentFolderPaths.add(desiredPath);
+            }
+        }
+
+        for (String managedPathToRemove : safePaths(managedFolderPathsToRemove)) {
+            if (currentFolderPaths.contains(managedPathToRemove) && !desiredPaths.contains(managedPathToRemove)) {
+                DfcReflection.invoke(object, "unlink", managedPathToRemove);
+                currentFolderPaths.remove(managedPathToRemove);
             }
         }
     }
@@ -262,6 +275,15 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
 
     private Map<String, Object> safeAttributes(Map<String, Object> attributes) {
         return attributes == null ? Map.of() : attributes;
+    }
+
+    private List<String> safePaths(List<String> folderPaths) {
+        if (folderPaths == null) {
+            return List.of();
+        }
+        return folderPaths.stream()
+                .filter(path -> path != null && !path.isBlank())
+                .toList();
     }
 
     private String requireText(String value, String message) {
