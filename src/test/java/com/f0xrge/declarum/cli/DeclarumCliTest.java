@@ -7,6 +7,8 @@ import com.f0xrge.declarum.dfc.adapter.DifferenceType;
 import com.f0xrge.declarum.dfc.adapter.PathChange;
 import com.f0xrge.declarum.dfc.adapter.RepositoryObjectSnapshot;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolution;
+import com.f0xrge.declarum.dfc.adapter.SelectorResolutionStatus;
+import com.f0xrge.declarum.engine.core.ApplyExecutor;
 import com.f0xrge.declarum.engine.core.EngineCore;
 import com.f0xrge.declarum.manifest.ManifestReader;
 import com.f0xrge.declarum.manifest.model.ResourceDefinition;
@@ -28,18 +30,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DeclarumCliTest {
 
     @Test
-    void shouldRunAnalysisAndPrintReadablePlan() throws Exception {
+    void shouldRejectInvalidUsage() {
         ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
         ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
         RecordingDfcAdapter dfcAdapter = new RecordingDfcAdapter();
-        EngineCore engineCore = new EngineCore(new ManifestReader(), new ManifestValidator(), dfcAdapter);
-        DeclarumCli cli = new DeclarumCli(
-                engineCore,
-                new PrintStream(outputBuffer, true, StandardCharsets.UTF_8),
-                new PrintStream(errorBuffer, true, StandardCharsets.UTF_8)
-        );
+        DeclarumCli cli = createCli(dfcAdapter, outputBuffer, errorBuffer);
 
-        int exitCode = cli.run(new String[]{getResourcePath("manifests/valid-manifest.yaml").toString()});
+        int exitCode = cli.run(new String[]{"apply", "one.yaml", "two.yaml"});
+
+        assertEquals(2, exitCode);
+        assertEquals("", outputBuffer.toString(StandardCharsets.UTF_8));
+        assertTrue(errorBuffer.toString(StandardCharsets.UTF_8).contains("Usage:"));
+        assertEquals(List.of(), dfcAdapter.resolvedResources);
+        assertEquals(0, dfcAdapter.createdResources);
+        assertEquals(0, dfcAdapter.updatedResources);
+        assertEquals(0, dfcAdapter.deletedResources);
+    }
+
+    @Test
+    void shouldRunPlanWithoutApplyingRepositoryModifications() throws Exception {
+        ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
+        RecordingDfcAdapter dfcAdapter = new RecordingDfcAdapter();
+        DeclarumCli cli = createCli(dfcAdapter, outputBuffer, errorBuffer);
+
+        int exitCode = cli.run(new String[]{"plan", getResourcePath("manifests/valid-manifest.yaml").toString()});
 
         assertEquals(0, exitCode);
         String output = outputBuffer.toString(StandardCharsets.UTF_8);
@@ -54,23 +69,88 @@ class DeclarumCliTest {
         assertTrue(output.contains("Planned action: DELETE"));
         assertEquals("", errorBuffer.toString(StandardCharsets.UTF_8));
         assertEquals(List.of("app-config-main", "obsolete-config"), dfcAdapter.resolvedResources);
+        assertEquals(0, dfcAdapter.createdResources);
+        assertEquals(0, dfcAdapter.updatedResources);
+        assertEquals(0, dfcAdapter.deletedResources);
     }
 
     @Test
-    void shouldRejectMissingManifestArgument() {
+    void shouldDefaultToPlanWithoutApplyingRepositoryModifications() throws Exception {
         ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
         ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
-        DeclarumCli cli = new DeclarumCli(
-                new EngineCore(new ManifestReader(), new ManifestValidator(), new RecordingDfcAdapter()),
+        RecordingDfcAdapter dfcAdapter = new RecordingDfcAdapter();
+        DeclarumCli cli = createCli(dfcAdapter, outputBuffer, errorBuffer);
+
+        int exitCode = cli.run(new String[]{getResourcePath("manifests/valid-manifest.yaml").toString()});
+
+        assertEquals(0, exitCode);
+        assertTrue(outputBuffer.toString(StandardCharsets.UTF_8).contains("Declarum analysis plan"));
+        assertEquals("", errorBuffer.toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("app-config-main", "obsolete-config"), dfcAdapter.resolvedResources);
+        assertEquals(0, dfcAdapter.createdResources);
+        assertEquals(0, dfcAdapter.updatedResources);
+        assertEquals(0, dfcAdapter.deletedResources);
+    }
+
+    @Test
+    void shouldApplyExplicitlyRequestedRepositoryModifications() throws Exception {
+        ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
+        RecordingDfcAdapter dfcAdapter = new RecordingDfcAdapter();
+        DeclarumCli cli = createCli(dfcAdapter, outputBuffer, errorBuffer);
+
+        int exitCode = cli.run(new String[]{"apply", getResourcePath("manifests/valid-manifest.yaml").toString()});
+
+        assertEquals(0, exitCode);
+        String output = outputBuffer.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains("Declarum analysis plan"));
+        assertTrue(output.contains("Declarum apply summary"));
+        assertTrue(output.contains("CREATED: 0"));
+        assertTrue(output.contains("UPDATED: 1"));
+        assertTrue(output.contains("DELETED: 1"));
+        assertTrue(output.contains("NO_OPERATION: 0"));
+        assertTrue(output.contains("FAILED: 0"));
+        assertEquals("", errorBuffer.toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("app-config-main", "obsolete-config"), dfcAdapter.resolvedResources);
+        assertEquals(0, dfcAdapter.createdResources);
+        assertEquals(1, dfcAdapter.updatedResources);
+        assertEquals(1, dfcAdapter.deletedResources);
+    }
+
+    @Test
+    void shouldFailApplyWhenInvalidSelectionProducesFailedAction() throws Exception {
+        ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
+        RecordingDfcAdapter dfcAdapter = new RecordingDfcAdapter();
+        dfcAdapter.invalidSelection = true;
+        DeclarumCli cli = createCli(dfcAdapter, outputBuffer, errorBuffer);
+
+        int exitCode = cli.run(new String[]{"--apply", getResourcePath("manifests/valid-manifest.yaml").toString()});
+
+        assertEquals(1, exitCode);
+        String output = outputBuffer.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains("Planned action: INVALID_SELECTION"));
+        assertTrue(output.contains("Declarum apply summary"));
+        assertTrue(output.contains("FAILED: 1"));
+        assertTrue(output.contains("- app-config-main: FAILED - Selector resolved to multiple objects"));
+        assertEquals("", errorBuffer.toString(StandardCharsets.UTF_8));
+        assertEquals(0, dfcAdapter.createdResources);
+        assertEquals(0, dfcAdapter.updatedResources);
+        assertEquals(1, dfcAdapter.deletedResources);
+    }
+
+    private DeclarumCli createCli(
+            RecordingDfcAdapter dfcAdapter,
+            ByteArrayOutputStream outputBuffer,
+            ByteArrayOutputStream errorBuffer
+    ) {
+        EngineCore engineCore = new EngineCore(new ManifestReader(), new ManifestValidator(), dfcAdapter);
+        return new DeclarumCli(
+                engineCore,
+                new ApplyExecutor(dfcAdapter),
                 new PrintStream(outputBuffer, true, StandardCharsets.UTF_8),
                 new PrintStream(errorBuffer, true, StandardCharsets.UTF_8)
         );
-
-        int exitCode = cli.run(new String[]{});
-
-        assertEquals(2, exitCode);
-        assertEquals("", outputBuffer.toString(StandardCharsets.UTF_8));
-        assertTrue(errorBuffer.toString(StandardCharsets.UTF_8).contains("Usage:"));
     }
 
     private Path getResourcePath(String resourceName) throws URISyntaxException {
@@ -80,10 +160,18 @@ class DeclarumCliTest {
     private static class RecordingDfcAdapter implements DfcAdapter {
 
         private final List<String> resolvedResources = new java.util.ArrayList<>();
+        private boolean invalidSelection;
+        private int createdResources;
+        private int updatedResources;
+        private int deletedResources;
 
         @Override
         public SelectorResolution resolveBySelector(ResourceDefinition resourceDefinition) {
             resolvedResources.add(resourceDefinition.getName());
+
+            if (invalidSelection && resourceDefinition.isPresentState()) {
+                return SelectorResolution.ambiguous();
+            }
 
             if (resourceDefinition.isPresentState()) {
                 Map<String, Object> actualAttributes = new LinkedHashMap<>();
@@ -101,6 +189,14 @@ class DeclarumCliTest {
 
         @Override
         public DifferenceAnalysis analyzeDifference(ResourceDefinition resourceDefinition, SelectorResolution selectorResolution) {
+            if (selectorResolution != null && SelectorResolutionStatus.AMBIGUOUS.equals(selectorResolution.getStatus())) {
+                return new DifferenceAnalysis(
+                        DifferenceType.INVALID_SELECTION,
+                        Map.of(),
+                        "Selector resolved to multiple objects"
+                );
+            }
+
             if (resourceDefinition.isPresentState()) {
                 Map<String, AttributeChange> changes = new LinkedHashMap<>();
                 changes.put("object_name", new AttributeChange("old-main-config", "main-config"));
@@ -117,7 +213,8 @@ class DeclarumCliTest {
 
         @Override
         public RepositoryObjectSnapshot createResource(ResourceDefinition resourceDefinition) {
-            throw new UnsupportedOperationException("Not required in this test");
+            createdResources++;
+            return new RepositoryObjectSnapshot("0900000000000003", "my_app_config", Map.of());
         }
 
         @Override
@@ -126,12 +223,13 @@ class DeclarumCliTest {
                 RepositoryObjectSnapshot actualObject,
                 DifferenceAnalysis differenceAnalysis
         ) {
-            throw new UnsupportedOperationException("Not required in this test");
+            updatedResources++;
+            return actualObject;
         }
 
         @Override
         public void deleteResource(RepositoryObjectSnapshot actualObject) {
-            throw new UnsupportedOperationException("Not required in this test");
+            deletedResources++;
         }
     }
 }
