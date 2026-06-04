@@ -174,9 +174,69 @@ class SessionBackedDfcAdapterTest {
         RepositoryObjectSnapshot updated = adapter.updateResource(updateDefinition, current, updateDifference);
         assertEquals("updated-id", updated.getObjectId());
         assertEquals(1, operations.updateCalls);
+        assertEquals(List.of(), operations.lastDesiredFolderPaths);
+        assertEquals(List.of(), operations.lastManagedFolderPathsToRemove);
 
         adapter.deleteResource(current);
         assertEquals(1, operations.deleteCalls);
+    }
+
+
+    @Test
+    void shouldUseLocationUpdateWhenOnlyLocationDiffers() {
+        RecordingRepositoryObjectOperations operations = new RecordingRepositoryObjectOperations();
+        SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
+                new InlineSessionManager(),
+                operations,
+                new ManagedAttributeValueChecker()
+        );
+
+        ResourceDefinition resourceDefinition = presentResourceWithLocation("object_name", "main", "/Cabinet/Expected");
+        RepositoryObjectSnapshot current = snapshot(
+                "0900001",
+                "dm_document",
+                Map.of("object_name", "main"),
+                List.of("/Cabinet/Actual")
+        );
+
+        DifferenceAnalysis updateDifference = adapter.analyzeDifference(resourceDefinition, SelectorResolution.found(current));
+        RepositoryObjectSnapshot updated = adapter.updateResource(resourceDefinition, current, updateDifference);
+
+        assertEquals(DifferenceType.UPDATE, updateDifference.getDifferenceType());
+        assertEquals("updated-id", updated.getObjectId());
+        assertEquals(1, operations.updateCalls);
+        assertEquals(Map.of("object_name", "main"), operations.lastAttributes);
+        assertEquals(List.of("/Cabinet/Expected"), operations.lastDesiredFolderPaths);
+        assertEquals(List.of(), operations.lastManagedFolderPathsToRemove);
+    }
+
+    @Test
+    void shouldRemoveOnlySelectorPathWhenPathSelectorDeclaresManagedCurrentLocation() {
+        RecordingRepositoryObjectOperations operations = new RecordingRepositoryObjectOperations();
+        SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
+                new InlineSessionManager(),
+                operations,
+                new ManagedAttributeValueChecker()
+        );
+
+        ResourceDefinition resourceDefinition = presentResourceWithLocation("object_name", "main", "/Cabinet/Expected");
+        resourceDefinition.getSelector().setType(SelectorType.PATH);
+        resourceDefinition.getSelector().setDql(null);
+        resourceDefinition.getSelector().setPath("/Cabinet/Old");
+        RepositoryObjectSnapshot current = snapshot(
+                "0900001",
+                "dm_document",
+                Map.of("object_name", "main"),
+                List.of("/Cabinet/Old", "/Cabinet/Unmanaged")
+        );
+
+        DifferenceAnalysis updateDifference = adapter.analyzeDifference(resourceDefinition, SelectorResolution.found(current));
+        adapter.updateResource(resourceDefinition, current, updateDifference);
+
+        assertEquals(DifferenceType.UPDATE, updateDifference.getDifferenceType());
+        assertEquals(List.of("/Cabinet/Old"), updateDifference.getManagedPathRemovals());
+        assertEquals(List.of("/Cabinet/Expected"), operations.lastDesiredFolderPaths);
+        assertEquals(List.of("/Cabinet/Old"), operations.lastManagedFolderPathsToRemove);
     }
 
     @Test
@@ -265,8 +325,10 @@ class SessionBackedDfcAdapterTest {
         private int findByQualificationCalls;
         private int createCalls;
         private int updateCalls;
-        private int linkFolderPathsCalls;
         private int deleteCalls;
+        private Map<String, Object> lastAttributes = Map.of();
+        private List<String> lastDesiredFolderPaths = List.of();
+        private List<String> lastManagedFolderPathsToRemove = List.of();
 
         private List<RepositoryObjectSnapshot> qualificationResults = new ArrayList<>();
 
@@ -294,15 +356,18 @@ class SessionBackedDfcAdapterTest {
         }
 
         @Override
-        public RepositoryObjectSnapshot updateAttributes(DocumentumSession session, String objectId, Map<String, Object> attributes) {
+        public RepositoryObjectSnapshot update(
+                DocumentumSession session,
+                String objectId,
+                Map<String, Object> attributes,
+                List<String> desiredFolderPaths,
+                List<String> managedFolderPathsToRemove
+        ) {
             updateCalls++;
-            return new RepositoryObjectSnapshot("updated-id", "dm_document", attributes);
-        }
-
-        @Override
-        public RepositoryObjectSnapshot linkFolderPaths(DocumentumSession session, String objectId, List<String> folderPaths) {
-            linkFolderPathsCalls++;
-            return new RepositoryObjectSnapshot("linked-id", "dm_document", Map.of(), folderPaths);
+            lastAttributes = attributes;
+            lastDesiredFolderPaths = desiredFolderPaths;
+            lastManagedFolderPathsToRemove = managedFolderPathsToRemove;
+            return new RepositoryObjectSnapshot("updated-id", "dm_document", attributes, desiredFolderPaths);
         }
 
         @Override
