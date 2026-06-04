@@ -110,6 +110,8 @@ set DOCUMENTUM_DOMAIN=your_domain
 set DOCUMENTUM_DFC_CONFIG_DIR=C:\path\to\documentum-config-directory
 ```
 
+For local-only connection settings, you may create `scripts\extra-envs.cmd`. When this file exists, `scripts\declarum-plan.cmd` calls it before validating the required Documentum variables. The file is ignored by Git and should not be committed because it can contain repository credentials.
+
 Run a plan analysis from a Windows command prompt with:
 
 ```cmd

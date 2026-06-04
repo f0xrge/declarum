@@ -4,6 +4,15 @@ setlocal EnableExtensions
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_DIR=%SCRIPT_DIR%.."
 set "MANIFEST_PATH=%~f1"
+set "EXTRA_ENVIRONMENT_SCRIPT=%SCRIPT_DIR%extra-envs.cmd"
+
+if exist "%EXTRA_ENVIRONMENT_SCRIPT%" (
+    call "%EXTRA_ENVIRONMENT_SCRIPT%"
+    if errorlevel 1 (
+        >&2 echo Failed to load optional environment variables from "%EXTRA_ENVIRONMENT_SCRIPT%".
+        exit /b 2
+    )
+)
 
 if "%MANIFEST_PATH%"=="" goto usage
 if "%~2" neq "" goto usage
