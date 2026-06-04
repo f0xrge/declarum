@@ -10,7 +10,7 @@ This starter pack includes:
 - Strict YAML loading via Jackson YAML
 - Engine core orchestration to load/validate manifests and request DFC difference analysis
 - Engine apply executor to run create/update/delete actions from analyzed differences
-- MVP command-line entry point for manifest analysis and plan rendering
+- MVP command-line entry point for safe plan rendering and explicit apply execution
 - DFC adapter contract for selector resolution and managed-difference analysis
 - Concrete DFC session and repository operations backed by the real Documentum client at runtime
 - Unit tests for manifest deserialization
@@ -36,11 +36,13 @@ Build a declarative convergence engine for Documentum repositories with a workfl
 Use the Maven wrapper so the project runs with the expected Maven version. If needed, a local Maven installation can still run `mvn test`.
 
 
-## CLI analysis mode
+## CLI plan and apply modes
 
-The MVP CLI runs analysis only: it loads a YAML manifest, validates it, asks the engine to analyze repository differences, and prints a readable plan. It does not apply changes.
+The CLI is safe by default. Without an explicit apply command or flag, it loads a YAML manifest, validates it, asks the engine to analyze repository differences, and prints a readable plan only. Plan mode does not apply changes.
 
-Set the required Documentum connection variables before running the CLI:
+Apply mode must be requested explicitly. In apply mode, Declarum first performs the same analysis, prints the plan, and then executes create, update, and delete actions against the Documentum repository. Apply mode modifies the repository and should be used only after reviewing the planned actions.
+
+Set the required Documentum connection variables before running either mode:
 
 ```bash
 export DOCUMENTUM_DOCBASE=your_docbase
@@ -54,7 +56,13 @@ Optional variable:
 export DOCUMENTUM_DOMAIN=your_domain
 ```
 
-Run plan analysis for a manifest with:
+Run a safe plan for a manifest with either the explicit `plan` command or the default single-argument form:
+
+```bash
+./mvnw -q compile exec:java \
+  -Dexec.mainClass=com.f0xrge.declarum.cli.DeclarumCli \
+  -Dexec.args="plan /path/to/manifest.yaml"
+```
 
 ```bash
 ./mvnw -q compile exec:java \
@@ -62,11 +70,29 @@ Run plan analysis for a manifest with:
   -Dexec.args=/path/to/manifest.yaml
 ```
 
-If the real DFC client is not already available to the runtime, add it to the Maven or Java classpath before running the command.
+Apply the plan with an explicit apply request:
+
+```bash
+./mvnw -q compile exec:java \
+  -Dexec.mainClass=com.f0xrge.declarum.cli.DeclarumCli \
+  -Dexec.args="apply /path/to/manifest.yaml"
+```
+
+The `--apply` flag is also supported:
+
+```bash
+./mvnw -q compile exec:java \
+  -Dexec.mainClass=com.f0xrge.declarum.cli.DeclarumCli \
+  -Dexec.args="--apply /path/to/manifest.yaml"
+```
+
+Apply mode prints an action summary for `CREATED`, `UPDATED`, `DELETED`, `NO_OPERATION`, and `FAILED`. A failed action summary indicates that Declarum could not safely execute at least one planned resource action.
+
+If the real DFC client is not already available to the runtime, add it to the Maven or Java classpath before running either mode.
 
 ## Windows execution script
 
-A Windows helper script is available to run the analysis CLI against a real Documentum repository. It compiles the project, copies Maven runtime dependencies into `target\declarum-runtime-dependencies`, adds the DFC JAR to the runtime classpath, and then launches `com.f0xrge.declarum.cli.DeclarumCli`.
+A Windows helper script is available to run the plan CLI against a real Documentum repository. It compiles the project, copies Maven runtime dependencies into `target\declarum-runtime-dependencies`, adds the DFC JAR to the runtime classpath, and then launches `com.f0xrge.declarum.cli.DeclarumCli`.
 
 Required environment variables:
 
@@ -90,7 +116,7 @@ Run a plan analysis from a Windows command prompt with:
 scripts\declarum-plan.cmd C:\path\to\manifest.yaml
 ```
 
-`DOCUMENTUM_DFC_CONFIG_DIR` should point to the directory containing runtime DFC configuration such as `dfc.properties` when your Documentum client setup requires it. The script only runs analysis mode; it does not apply changes.
+`DOCUMENTUM_DFC_CONFIG_DIR` should point to the directory containing runtime DFC configuration such as `dfc.properties` when your Documentum client setup requires it. The script only runs plan mode; it does not apply changes. Use the Java CLI `apply` command or `--apply` flag only when you intentionally want to modify the Documentum repository.
 
 ## Documentum integration tests
 
