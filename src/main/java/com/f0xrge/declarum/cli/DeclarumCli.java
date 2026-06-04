@@ -3,6 +3,7 @@ package com.f0xrge.declarum.cli;
 import com.f0xrge.declarum.dfc.adapter.AttributeChange;
 import com.f0xrge.declarum.dfc.adapter.DfcAdapter;
 import com.f0xrge.declarum.dfc.adapter.DifferenceAnalysis;
+import com.f0xrge.declarum.dfc.adapter.PathChange;
 import com.f0xrge.declarum.dfc.adapter.RepositoryObjectSnapshot;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolution;
 import com.f0xrge.declarum.dfc.adapter.impl.SessionBackedDfcAdapter;
@@ -21,6 +22,7 @@ import com.f0xrge.declarum.manifest.validation.ManifestValidator;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -102,6 +104,7 @@ public class DeclarumCli {
                 builder.append("  Reason: ").append(differenceAnalysis.getMessage()).append('\n');
             }
             appendAttributeChanges(builder, differenceAnalysis.getManagedAttributeChanges());
+            appendPathChanges(builder, differenceAnalysis.getPathChanges());
             builder.append('\n');
         }
 
@@ -150,6 +153,19 @@ public class DeclarumCli {
             builder.append("    - ").append(changeEntry.getKey())
                     .append(": ").append(change.getCurrentValue())
                     .append(" -> ").append(change.getDesiredValue())
+                    .append('\n');
+        }
+    }
+
+    private static void appendPathChanges(StringBuilder builder, List<PathChange> changes) {
+        if (changes == null || changes.isEmpty()) {
+            return;
+        }
+
+        builder.append("  Path changes:\n");
+        for (PathChange change : changes) {
+            builder.append("    - folder path: ").append(change.getCurrentPaths())
+                    .append(" -> ").append(change.getDesiredPath())
                     .append('\n');
         }
     }

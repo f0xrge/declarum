@@ -7,6 +7,7 @@ import com.f0xrge.declarum.dfc.session.DocumentumSession;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,7 +84,43 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
     private RepositoryObjectSnapshot toSnapshot(Object object) {
         String objectId = DfcReflection.invoke(DfcReflection.invoke(object, "getObjectId"), "toString").toString();
         String objectType = DfcReflection.invoke(object, "getTypeName").toString();
-        return new RepositoryObjectSnapshot(objectId, objectType, readAttributes(object));
+        return new RepositoryObjectSnapshot(objectId, objectType, readAttributes(object), readFolderPaths(object));
+    }
+
+    private List<String> readFolderPaths(Object object) {
+        if (!DfcReflection.hasCompatibleMethod(object, "getFolderIdCount")) {
+            return List.of();
+        }
+
+        int folderIdCount = (Integer) DfcReflection.invoke(object, "getFolderIdCount");
+        if (folderIdCount == 0) {
+            return List.of();
+        }
+
+        Object session = DfcReflection.invoke(object, "getSession");
+        LinkedHashSet<String> folderPaths = new LinkedHashSet<>();
+        for (int index = 0; index < folderIdCount; index++) {
+            Object folderId = DfcReflection.invoke(object, "getFolderId", index);
+            Object folder = DfcReflection.invoke(session, "getObject", folderId);
+            folderPaths.addAll(readFolderObjectPaths(folder));
+        }
+        return new ArrayList<>(folderPaths);
+    }
+
+    private List<String> readFolderObjectPaths(Object folder) {
+        int pathCount = 1;
+        if (DfcReflection.hasCompatibleMethod(folder, "getFolderPathCount")) {
+            pathCount = (Integer) DfcReflection.invoke(folder, "getFolderPathCount");
+        }
+
+        List<String> folderPaths = new ArrayList<>();
+        for (int index = 0; index < pathCount; index++) {
+            String folderPath = DfcReflection.invoke(folder, "getFolderPath", index).toString();
+            if (!folderPath.isBlank()) {
+                folderPaths.add(folderPath);
+            }
+        }
+        return folderPaths;
     }
 
     private Map<String, Object> readAttributes(Object object) {
