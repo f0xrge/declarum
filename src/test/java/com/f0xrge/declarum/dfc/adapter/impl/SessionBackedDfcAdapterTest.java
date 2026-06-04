@@ -51,6 +51,78 @@ class SessionBackedDfcAdapterTest {
         assertEquals(1, operations.findByQualificationCalls);
     }
 
+
+    @Test
+    void shouldDetectNoChangesWhenDesiredPathMatchesCurrentFolderPath() {
+        SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
+                new InlineSessionManager(),
+                new RecordingRepositoryObjectOperations(),
+                new ManagedAttributeValueChecker()
+        );
+
+        ResourceDefinition resourceDefinition = presentResourceWithLocation("title", "value", "/Cabinet/Expected");
+        RepositoryObjectSnapshot current = snapshot(
+                "0900001",
+                "dm_document",
+                Map.of("title", "value"),
+                List.of("/Cabinet/Expected")
+        );
+
+        DifferenceAnalysis difference = adapter.analyzeDifference(resourceDefinition, SelectorResolution.found(current));
+
+        assertEquals(DifferenceType.NO_CHANGES, difference.getDifferenceType());
+        assertEquals(0, difference.getPathChanges().size());
+    }
+
+    @Test
+    void shouldUpdateWhenDesiredPathIsAbsentFromCurrentFolderPaths() {
+        SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
+                new InlineSessionManager(),
+                new RecordingRepositoryObjectOperations(),
+                new ManagedAttributeValueChecker()
+        );
+
+        ResourceDefinition resourceDefinition = presentResourceWithLocation("title", "value", "/Cabinet/Expected");
+        RepositoryObjectSnapshot current = snapshot(
+                "0900001",
+                "dm_document",
+                Map.of("title", "value"),
+                List.of("/Cabinet/Other")
+        );
+
+        DifferenceAnalysis difference = adapter.analyzeDifference(resourceDefinition, SelectorResolution.found(current));
+
+        assertEquals(DifferenceType.UPDATE, difference.getDifferenceType());
+        assertEquals("Managed location differs", difference.getMessage());
+        assertEquals(1, difference.getPathChanges().size());
+        assertEquals(List.of("/Cabinet/Other"), difference.getPathChanges().get(0).getCurrentPaths());
+        assertEquals("/Cabinet/Expected", difference.getPathChanges().get(0).getDesiredPath());
+    }
+
+    @Test
+    void shouldUpdateWhenAttributesAreCompliantButLocationIsNotCompliant() {
+        SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
+                new InlineSessionManager(),
+                new RecordingRepositoryObjectOperations(),
+                new ManagedAttributeValueChecker()
+        );
+
+        ResourceDefinition resourceDefinition = presentResourceWithLocation("object_name", "main", "/Cabinet/Expected");
+        RepositoryObjectSnapshot current = snapshot(
+                "0900001",
+                "dm_document",
+                Map.of("object_name", "main"),
+                List.of("/Cabinet/Actual")
+        );
+
+        DifferenceAnalysis difference = adapter.analyzeDifference(resourceDefinition, SelectorResolution.found(current));
+
+        assertEquals(DifferenceType.UPDATE, difference.getDifferenceType());
+        assertEquals(0, difference.getManagedAttributeChanges().size());
+        assertEquals(1, difference.getPathChanges().size());
+        assertEquals("Managed location differs", difference.getMessage());
+    }
+
     @Test
     void shouldCreateUpdateAndDeleteObjectsThroughRepositoryOperations() {
         RecordingRepositoryObjectOperations operations = new RecordingRepositoryObjectOperations();
@@ -122,8 +194,25 @@ class SessionBackedDfcAdapterTest {
         return resourceDefinition;
     }
 
+    private ResourceDefinition presentResourceWithLocation(String attributeName, Object attributeValue, String folderPath) {
+        ResourceDefinition resourceDefinition = presentResource(attributeName, attributeValue);
+        ResourceLocation location = new ResourceLocation();
+        location.setPath(folderPath);
+        resourceDefinition.getSpec().setLocation(location);
+        return resourceDefinition;
+    }
+
     private RepositoryObjectSnapshot snapshot(String objectId, String objectType, Map<String, Object> attributes) {
-        return new RepositoryObjectSnapshot(objectId, objectType, attributes);
+        return snapshot(objectId, objectType, attributes, List.of());
+    }
+
+    private RepositoryObjectSnapshot snapshot(
+            String objectId,
+            String objectType,
+            Map<String, Object> attributes,
+            List<String> folderPaths
+    ) {
+        return new RepositoryObjectSnapshot(objectId, objectType, attributes, folderPaths);
     }
 
     private static final class InlineSessionManager implements SessionManager {
@@ -174,7 +263,7 @@ class SessionBackedDfcAdapterTest {
         ) {
             createCalls++;
             assertNotNull(objectType);
-            return new RepositoryObjectSnapshot("created-id", objectType, attributes);
+            return new RepositoryObjectSnapshot("created-id", objectType, attributes, List.of(folderPath));
         }
 
         @Override

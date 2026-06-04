@@ -4,6 +4,7 @@ import com.f0xrge.declarum.dfc.adapter.AttributeChange;
 import com.f0xrge.declarum.dfc.adapter.DfcAdapter;
 import com.f0xrge.declarum.dfc.adapter.DifferenceAnalysis;
 import com.f0xrge.declarum.dfc.adapter.DifferenceType;
+import com.f0xrge.declarum.dfc.adapter.PathChange;
 import com.f0xrge.declarum.dfc.adapter.RepositoryObjectSnapshot;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolution;
 import com.f0xrge.declarum.engine.core.EngineCore;
@@ -47,6 +48,8 @@ class DeclarumCliTest {
         assertTrue(output.contains("- app-config-main"));
         assertTrue(output.contains("Planned action: UPDATE"));
         assertTrue(output.contains("object_name: old-main-config -> main-config"));
+        assertTrue(output.contains("Path changes:"));
+        assertTrue(output.contains("folder path: [/Cabinet/OldConfig] -> /Cabinet/Config"));
         assertTrue(output.contains("- obsolete-config"));
         assertTrue(output.contains("Planned action: DELETE"));
         assertEquals("", errorBuffer.toString(StandardCharsets.UTF_8));
@@ -85,7 +88,12 @@ class DeclarumCliTest {
             if (resourceDefinition.isPresentState()) {
                 Map<String, Object> actualAttributes = new LinkedHashMap<>();
                 actualAttributes.put("object_name", "old-main-config");
-                return SelectorResolution.found(new RepositoryObjectSnapshot("0900000000000001", "my_app_config", actualAttributes));
+                return SelectorResolution.found(new RepositoryObjectSnapshot(
+                        "0900000000000001",
+                        "my_app_config",
+                        actualAttributes,
+                        List.of("/Cabinet/OldConfig")
+                ));
             }
 
             return SelectorResolution.found(new RepositoryObjectSnapshot("0900000000000002", "dm_document", Map.of()));
@@ -96,7 +104,12 @@ class DeclarumCliTest {
             if (resourceDefinition.isPresentState()) {
                 Map<String, AttributeChange> changes = new LinkedHashMap<>();
                 changes.put("object_name", new AttributeChange("old-main-config", "main-config"));
-                return new DifferenceAnalysis(DifferenceType.UPDATE, changes, "Managed attributes differ");
+                return new DifferenceAnalysis(
+                        DifferenceType.UPDATE,
+                        changes,
+                        List.of(new PathChange(List.of("/Cabinet/OldConfig"), "/Cabinet/Config")),
+                        "Managed attributes and location differ"
+                );
             }
 
             return new DifferenceAnalysis(DifferenceType.DELETE, Map.of(), "Object exists and must be deleted");

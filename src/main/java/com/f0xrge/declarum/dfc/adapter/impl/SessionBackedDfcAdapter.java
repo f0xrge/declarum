@@ -4,6 +4,7 @@ import com.f0xrge.declarum.dfc.adapter.AttributeChange;
 import com.f0xrge.declarum.dfc.adapter.DfcAdapter;
 import com.f0xrge.declarum.dfc.adapter.DifferenceAnalysis;
 import com.f0xrge.declarum.dfc.adapter.DifferenceType;
+import com.f0xrge.declarum.dfc.adapter.PathChange;
 import com.f0xrge.declarum.dfc.adapter.RepositoryObjectSnapshot;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolution;
 import com.f0xrge.declarum.dfc.adapter.SelectorResolutionStatus;
@@ -140,10 +141,16 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
         }
 
         Map<String, Object> desiredAttributes = spec == null || spec.getAttributes() == null ? Map.of() : spec.getAttributes();
-        Map<String, AttributeChange> changes = valueChecker.computeChanges(desiredAttributes, existingObject.getAttributes());
+        Map<String, AttributeChange> attributeChanges = valueChecker.computeChanges(desiredAttributes, existingObject.getAttributes());
+        List<PathChange> pathChanges = computePathChanges(spec, existingObject);
 
-        if (changes.isEmpty()) {
-            DifferenceAnalysis analysis = new DifferenceAnalysis(DifferenceType.NO_CHANGES, Map.of(), "Managed attributes are already compliant");
+        if (attributeChanges.isEmpty() && pathChanges.isEmpty()) {
+            DifferenceAnalysis analysis = new DifferenceAnalysis(
+                    DifferenceType.NO_CHANGES,
+                    Map.of(),
+                    List.of(),
+                    "Managed attributes and location are already compliant"
+            );
             TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
                     "resource.name", resourceDefinition.getName(),
                     "difference.type", analysis.getDifferenceType()
@@ -153,15 +160,40 @@ public class SessionBackedDfcAdapter implements DfcAdapter {
 
         DifferenceAnalysis analysis = new DifferenceAnalysis(
                 DifferenceType.UPDATE,
-                changes,
-                "Managed attributes differ"
+                attributeChanges,
+                pathChanges,
+                differenceMessage(attributeChanges, pathChanges)
         );
         TelemetryLog.info(LOGGER, "dfc.diff.analyze.result", TelemetryLog.fields(
                 "resource.name", resourceDefinition.getName(),
                 "difference.type", analysis.getDifferenceType(),
-                "difference.changed_count", analysis.getManagedAttributeChanges().size()
+                "difference.attribute_changed_count", analysis.getManagedAttributeChanges().size(),
+                "difference.path_changed_count", analysis.getPathChanges().size()
         ));
         return analysis;
+    }
+
+    private List<PathChange> computePathChanges(ResourceSpec spec, RepositoryObjectSnapshot existingObject) {
+        String desiredPath = spec == null || spec.getLocation() == null ? null : spec.getLocation().getPath();
+        if (desiredPath == null || desiredPath.isBlank()) {
+            return List.of();
+        }
+
+        List<String> currentPaths = existingObject.getFolderPaths();
+        if (currentPaths.contains(desiredPath)) {
+            return List.of();
+        }
+        return List.of(new PathChange(currentPaths, desiredPath));
+    }
+
+    private String differenceMessage(Map<String, AttributeChange> attributeChanges, List<PathChange> pathChanges) {
+        if (!attributeChanges.isEmpty() && !pathChanges.isEmpty()) {
+            return "Managed attributes and location differ";
+        }
+        if (!pathChanges.isEmpty()) {
+            return "Managed location differs";
+        }
+        return "Managed attributes differ";
     }
 
     @Override
