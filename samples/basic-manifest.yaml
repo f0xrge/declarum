@@ -16,6 +16,8 @@ resources:
         object_name: "dm_ConsistencyChecker"
         run_interval: 2
         is_inactive: true
+      location:
+        path: "/System/Jobs"
   - name: dm_DataDictionaryPublisher
     resourceType: sysobject
     state: present
@@ -43,3 +45,7 @@ resources:
         run_interval: 2
         is_inactive: true
         method_name: "dummy_test_method"
+      location:
+        paths:
+          - "/System/Jobs"
+          - "/Temp"
