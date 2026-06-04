@@ -1,2 +1,3 @@
 # Ignore all files in the target directory
 target/*
+scripts/extra-envs.cmd

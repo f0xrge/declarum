@@ -1,22 +1,45 @@
 apiVersion: docrepo/v1alpha1
 kind: Manifest
 metadata:
-  name: billing-config
+  name: jobs-configuration
 resources:
-  - name: app-config-main
+  - name: dm_ConsistencyChecker
     resourceType: sysobject
     state: present
     selector:
       type: qualification
-      dql: "my_app_config where config_key = 'main'"
-      expectedType: my_app_config
+      dql: "dm_job where object_name = 'dm_ConsistencyChecker'"
+      expectedType: dm_job
     spec:
-      objectType: my_app_config
+      objectType: dm_job
       attributes:
-        object_name: "main-config"
-        config_key: "main"
-        config_value: "https://api.internal.local"
-        is_active: true
-        tags:
-          - "billing"
-          - "prod"
+        object_name: "dm_ConsistencyChecker"
+        run_interval: 2
+        is_inactive: true
+  - name: dm_DataDictionaryPublisher
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_job where object_name = 'dm_DataDictionaryPublisher'"
+      expectedType: dm_job
+    spec:
+      objectType: dm_job
+      attributes:
+        object_name: "dm_DataDictionaryPublisher"
+        run_interval: 30
+        is_inactive: false
+  - name: dummy_test_job
+    resourceType: sysobject
+    state: present
+    selector:
+      type: qualification
+      dql: "dm_job where object_name = 'dummy_test_job'"
+      expectedType: dm_job
+    spec:
+      objectType: dm_job
+      attributes:
+        object_name: "dummy_test_job"
+        run_interval: 2
+        is_inactive: true
+        method_name: "dummy_test_method"
