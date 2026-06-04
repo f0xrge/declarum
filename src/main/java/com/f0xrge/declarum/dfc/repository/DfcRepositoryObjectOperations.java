@@ -47,13 +47,11 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
     }
 
     @Override
-    public RepositoryObjectSnapshot create(DocumentumSession session, String objectType, Map<String, Object> attributes, String folderPath) {
+    public RepositoryObjectSnapshot create(DocumentumSession session, String objectType, Map<String, Object> attributes, List<String> folderPaths) {
         Object dfcSession = requireDfcSession(session);
         Object object = DfcReflection.invoke(dfcSession, "newObject", requireText(objectType, "objectType is required"));
         applyAttributes(object, safeAttributes(attributes));
-        if (folderPath != null && !folderPath.isBlank()) {
-            DfcReflection.invoke(object, "link", folderPath);
-        }
+        linkFolderPaths(object, folderPaths);
         DfcReflection.invoke(object, "save");
         return toSnapshot(object);
     }
@@ -62,6 +60,14 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
     public RepositoryObjectSnapshot updateAttributes(DocumentumSession session, String objectId, Map<String, Object> attributes) {
         Object object = getObjectById(requireDfcSession(session), requireText(objectId, "objectId is required"));
         applyAttributes(object, safeAttributes(attributes));
+        DfcReflection.invoke(object, "save");
+        return toSnapshot(object);
+    }
+
+    @Override
+    public RepositoryObjectSnapshot linkFolderPaths(DocumentumSession session, String objectId, List<String> folderPaths) {
+        Object object = getObjectById(requireDfcSession(session), requireText(objectId, "objectId is required"));
+        linkFolderPaths(object, folderPaths);
         DfcReflection.invoke(object, "save");
         return toSnapshot(object);
     }
@@ -182,6 +188,17 @@ public class DfcRepositoryObjectOperations implements RepositoryObjectOperations
 
     private int dfcAttributeType(String fieldName) {
         return (Integer) DfcReflection.staticField("com.documentum.fc.common.IDfAttr", fieldName);
+    }
+
+    private void linkFolderPaths(Object object, List<String> folderPaths) {
+        if (folderPaths == null) {
+            return;
+        }
+        for (String folderPath : folderPaths) {
+            if (folderPath != null && !folderPath.isBlank()) {
+                DfcReflection.invoke(object, "link", folderPath);
+            }
+        }
     }
 
     private void applyAttributes(Object object, Map<String, Object> attributes) {

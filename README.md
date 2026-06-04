@@ -157,6 +157,10 @@ com.f0xrge.declarum
 │       └── SelectorType.java
 ```
 
+## YAML location contract
+
+A present resource may declare managed repository folder links with `spec.location`. Use `location.path` for exactly one managed folder path, or `location.paths` for one or more managed folder paths. The two fields are mutually exclusive, path values must not be blank, `paths` must not be empty, and unknown YAML properties still fail strict deserialization.
+
 ## YAML example
 
 ```yaml
@@ -182,4 +186,8 @@ resources:
         tags:
           - "billing"
           - "prod"
+      location:
+        paths:
+          - "/Cabinet/Config"
+          - "/Cabinet/Archive"
 ```

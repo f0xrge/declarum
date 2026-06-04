@@ -100,6 +100,32 @@ class SessionBackedDfcAdapterTest {
     }
 
     @Test
+    void shouldUpdateWhenAnyDesiredLocationPathIsAbsentFromCurrentFolderPaths() {
+        SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
+                new InlineSessionManager(),
+                new RecordingRepositoryObjectOperations(),
+                new ManagedAttributeValueChecker()
+        );
+
+        ResourceDefinition resourceDefinition = presentResource("title", "value");
+        ResourceLocation location = new ResourceLocation();
+        location.setPaths(List.of("/Cabinet/Expected", "/Cabinet/Archive"));
+        resourceDefinition.getSpec().setLocation(location);
+        RepositoryObjectSnapshot current = snapshot(
+                "0900001",
+                "dm_document",
+                Map.of("title", "value"),
+                List.of("/Cabinet/Expected")
+        );
+
+        DifferenceAnalysis difference = adapter.analyzeDifference(resourceDefinition, SelectorResolution.found(current));
+
+        assertEquals(DifferenceType.UPDATE, difference.getDifferenceType());
+        assertEquals(1, difference.getPathChanges().size());
+        assertEquals("/Cabinet/Archive", difference.getPathChanges().get(0).getDesiredPath());
+    }
+
+    @Test
     void shouldUpdateWhenAttributesAreCompliantButLocationIsNotCompliant() {
         SessionBackedDfcAdapter adapter = new SessionBackedDfcAdapter(
                 new InlineSessionManager(),
@@ -239,6 +265,7 @@ class SessionBackedDfcAdapterTest {
         private int findByQualificationCalls;
         private int createCalls;
         private int updateCalls;
+        private int linkFolderPathsCalls;
         private int deleteCalls;
 
         private List<RepositoryObjectSnapshot> qualificationResults = new ArrayList<>();
@@ -259,17 +286,23 @@ class SessionBackedDfcAdapterTest {
                 DocumentumSession session,
                 String objectType,
                 Map<String, Object> attributes,
-                String folderPath
+                List<String> folderPaths
         ) {
             createCalls++;
             assertNotNull(objectType);
-            return new RepositoryObjectSnapshot("created-id", objectType, attributes, List.of(folderPath));
+            return new RepositoryObjectSnapshot("created-id", objectType, attributes, folderPaths);
         }
 
         @Override
         public RepositoryObjectSnapshot updateAttributes(DocumentumSession session, String objectId, Map<String, Object> attributes) {
             updateCalls++;
             return new RepositoryObjectSnapshot("updated-id", "dm_document", attributes);
+        }
+
+        @Override
+        public RepositoryObjectSnapshot linkFolderPaths(DocumentumSession session, String objectId, List<String> folderPaths) {
+            linkFolderPathsCalls++;
+            return new RepositoryObjectSnapshot("linked-id", "dm_document", Map.of(), folderPaths);
         }
 
         @Override

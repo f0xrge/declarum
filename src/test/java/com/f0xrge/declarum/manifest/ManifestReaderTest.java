@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,9 +42,31 @@ class ManifestReaderTest {
     }
 
     @Test
+    void shouldReadValidManifestWithMultipleLocationPaths() throws Exception {
+        ManifestReader manifestReader = new ManifestReader();
+        Path manifestPath = getResourcePath("manifests/valid-manifest-with-multiple-location-paths.yaml");
+
+        ManifestDefinition manifest = manifestReader.read(manifestPath);
+
+        assertNotNull(manifest.getResources().get(0).getSpec().getLocation());
+        assertEquals(
+                List.of("/Cabinet/Config", "/Cabinet/Archive"),
+                manifest.getResources().get(0).getSpec().getLocation().getPaths()
+        );
+    }
+
+    @Test
     void shouldFailWhenManifestContainsUnknownProperty() throws Exception {
         ManifestReader manifestReader = new ManifestReader();
         Path manifestPath = getResourcePath("manifests/invalid/unknown-property.yaml");
+
+        assertThrows(UnrecognizedPropertyException.class, () -> manifestReader.read(manifestPath));
+    }
+
+    @Test
+    void shouldFailWhenLocationContainsUnknownProperty() throws Exception {
+        ManifestReader manifestReader = new ManifestReader();
+        Path manifestPath = getResourcePath("manifests/invalid/unknown-location-property.yaml");
 
         assertThrows(UnrecognizedPropertyException.class, () -> manifestReader.read(manifestPath));
     }
